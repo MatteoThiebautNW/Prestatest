@@ -6146,46 +6146,19 @@ class appProdProjectContainerUrlMatcher extends Symfony\Bundle\FrameworkBundle\R
                 }
                 not_admin_module_cart:
 
-                if (0 === strpos($pathinfo, '/improve/modules/catalog')) {
-                    // admin_module_catalog
-                    if ('/improve/modules/catalog' === $pathinfo) {
-                        $ret = array (  '_controller' => 'PrestaShopBundle\\Controller\\Admin\\Improve\\ModuleController::catalogAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog',  '_route' => 'admin_module_catalog',);
-                        if (!in_array($canonicalMethod, ['GET'])) {
-                            $allow = array_merge($allow, ['GET']);
-                            goto not_admin_module_catalog;
-                        }
-
-                        return $ret;
+                // admin_module_catalog_post
+                if ('/improve/modules/catalog/recommended' === $pathinfo) {
+                    $ret = array (  '_controller' => 'PrestaShopBundle\\Controller\\Admin\\Improve\\ModuleController::getPreferredModulesAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog:recommended',  '_route' => 'admin_module_catalog_post',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_admin_module_catalog_post;
                     }
-                    not_admin_module_catalog:
 
-                    // admin_module_catalog_refresh
-                    if (0 === strpos($pathinfo, '/improve/modules/catalog/refresh') && preg_match('#^/improve/modules/catalog/refresh(?:/(?P<category>[^/]++)(?:/(?P<keyword>[^/]++))?)?$#sD', $pathinfo, $matches)) {
-                        $ret = $this->mergeDefaults(array_replace($matches, ['_route' => 'admin_module_catalog_refresh']), array (  'category' => NULL,  'keyword' => NULL,  '_controller' => 'PrestaShopBundle\\Controller\\Admin\\Improve\\ModuleController::refreshCatalogAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog:refresh',));
-                        if (!in_array($canonicalMethod, ['GET'])) {
-                            $allow = array_merge($allow, ['GET']);
-                            goto not_admin_module_catalog_refresh;
-                        }
-
-                        return $ret;
-                    }
-                    not_admin_module_catalog_refresh:
-
-                    // admin_module_catalog_post
-                    if ('/improve/modules/catalog/recommended' === $pathinfo) {
-                        $ret = array (  '_controller' => 'PrestaShopBundle\\Controller\\Admin\\Improve\\ModuleController::getPreferredModulesAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog:recommended',  '_route' => 'admin_module_catalog_post',);
-                        if (!in_array($canonicalMethod, ['GET'])) {
-                            $allow = array_merge($allow, ['GET']);
-                            goto not_admin_module_catalog_post;
-                        }
-
-                        return $ret;
-                    }
-                    not_admin_module_catalog_post:
-
+                    return $ret;
                 }
+                not_admin_module_catalog_post:
 
-                elseif (0 === strpos($pathinfo, '/improve/modules/manage')) {
+                if (0 === strpos($pathinfo, '/improve/modules/manage')) {
                     // admin_module_manage
                     if (preg_match('#^/improve/modules/manage(?:/(?P<category>[^/]++)(?:/(?P<keyword>[^/]++))?)?$#sD', $pathinfo, $matches)) {
                         $ret = $this->mergeDefaults(array_replace($matches, ['_route' => 'admin_module_manage']), array (  'category' => NULL,  'keyword' => NULL,  '_controller' => 'PrestaShopBundle\\Controller\\Admin\\Improve\\ModuleController::manageAction',  '_legacy_controller' => 'AdminModulesManage',  '_legacy_link' =>   array (    0 => 'AdminModulesManage',    1 => 'AdminModulesSf',  ),));
@@ -7449,6 +7422,183 @@ class appProdProjectContainerUrlMatcher extends Symfony\Bundle\FrameworkBundle\R
         }
 
         elseif (0 === strpos($pathinfo, '/modules')) {
+            if (0 === strpos($pathinfo, '/modules/addons')) {
+                if (0 === strpos($pathinfo, '/modules/addons/modules/catalog')) {
+                    // admin_mbo_catalog_module
+                    if ('/modules/addons/modules/catalog' === $pathinfo) {
+                        $ret = array (  '_controller' => 'mbo.controller.modules:catalogAction',  '_legacy_controller' => 'AdminPsMboModule',  '_legacy_link' => 'AdminPsMboModule',  '_route' => 'admin_mbo_catalog_module',);
+                        if (!in_array($canonicalMethod, ['GET'])) {
+                            $allow = array_merge($allow, ['GET']);
+                            goto not_admin_mbo_catalog_module;
+                        }
+
+                        return $ret;
+                    }
+                    not_admin_mbo_catalog_module:
+
+                    // admin_mbo_catalog_module_selection
+                    if ('/modules/addons/modules/catalog/selection' === $pathinfo) {
+                        $ret = array (  '_controller' => 'mbo.controller.modules.selection:indexAction',  '_legacy_controller' => 'AdminPsMboAddons',  '_legacy_link' => 'AdminPsMboAddons',  '_route' => 'admin_mbo_catalog_module_selection',);
+                        if (!in_array($canonicalMethod, ['GET'])) {
+                            $allow = array_merge($allow, ['GET']);
+                            goto not_admin_mbo_catalog_module_selection;
+                        }
+
+                        return $ret;
+                    }
+                    not_admin_mbo_catalog_module_selection:
+
+                }
+
+                // admin_mbo_recommended_modules
+                if ('/modules/addons/modules/recommended' === $pathinfo) {
+                    $ret = array (  '_controller' => 'mbo.controller.modules.recommended:indexAction',  '_legacy_controller' => 'AdminPsMboRecommended',  '_legacy_link' => 'AdminPsMboRecommended',  '_route' => 'admin_mbo_recommended_modules',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_admin_mbo_recommended_modules;
+                    }
+
+                    return $ret;
+                }
+                not_admin_mbo_recommended_modules:
+
+                // admin_mbo_catalog_theme
+                if ('/modules/addons/themes/catalog' === $pathinfo) {
+                    $ret = array (  '_controller' => 'mbo.controller.themes.catalog:indexAction',  '_legacy_controller' => 'AdminPsMboTheme',  '_legacy_link' => 'AdminPsMboTheme',  '_route' => 'admin_mbo_catalog_theme',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_admin_mbo_catalog_theme;
+                    }
+
+                    return $ret;
+                }
+                not_admin_mbo_catalog_theme:
+
+                // admin_mbo_customer_bought_modules
+                if ('/modules/addons/customer/modules' === $pathinfo) {
+                    $ret = array (  '_controller' => 'mbo.controller.modules:getBoughtModulesAction',  '_route' => 'admin_mbo_customer_bought_modules',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_admin_mbo_customer_bought_modules;
+                    }
+
+                    return $ret;
+                }
+                not_admin_mbo_customer_bought_modules:
+
+            }
+
+            // admin_module_catalog
+            if ('/modules/improve/modules/catalog' === $pathinfo) {
+                $ret = array (  '_controller' => 'mbo.controller.modules:catalogAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog',  '_route' => 'admin_module_catalog',);
+                if (!in_array($canonicalMethod, ['GET'])) {
+                    $allow = array_merge($allow, ['GET']);
+                    goto not_admin_module_catalog;
+                }
+
+                return $ret;
+            }
+            not_admin_module_catalog:
+
+            // admin_module_catalog_refresh
+            if (0 === strpos($pathinfo, '/modules/catalog/refresh') && preg_match('#^/modules/catalog/refresh(?:/(?P<category>[^/]++)(?:/(?P<keyword>[^/]++))?)?$#sD', $pathinfo, $matches)) {
+                $ret = $this->mergeDefaults(array_replace($matches, ['_route' => 'admin_module_catalog_refresh']), array (  'category' => NULL,  'keyword' => NULL,  '_controller' => 'mbo.controller.modules:refreshCatalogAction',  '_legacy_controller' => 'AdminModulesCatalog',  '_legacy_link' => 'AdminModulesCatalog:refresh',));
+                if (!in_array($canonicalMethod, ['GET'])) {
+                    $allow = array_merge($allow, ['GET']);
+                    goto not_admin_module_catalog_refresh;
+                }
+
+                return $ret;
+            }
+            not_admin_module_catalog_refresh:
+
+            // admin_mbo_module_cdc_error
+            if ('/modules/cdc_error' === $pathinfo) {
+                $ret = array (  '_controller' => 'mbo.controller.modules:cdcErrorAction',  '_route' => 'admin_mbo_module_cdc_error',);
+                if (!in_array($canonicalMethod, ['GET'])) {
+                    $allow = array_merge($allow, ['GET']);
+                    goto not_admin_mbo_module_cdc_error;
+                }
+
+                return $ret;
+            }
+            not_admin_mbo_module_cdc_error:
+
+            // admin_mbo_security
+            if ('/modules/mbo/me' === $pathinfo) {
+                $ret = array (  '_controller' => 'mbo.controller.security:meAction',  '_route' => 'admin_mbo_security',);
+                if (!in_array($requestMethod, ['POST'])) {
+                    $allow = array_merge($allow, ['POST']);
+                    goto not_admin_mbo_security;
+                }
+
+                return $ret;
+            }
+            not_admin_mbo_security:
+
+            if (0 === strpos($pathinfo, '/modules/metrics')) {
+                // metrics_page
+                if ('/modules/metrics' === $pathinfo) {
+                    $ret = array (  '_controller' => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsController::renderApp',  '_legacy_controller' => 'AdminMetricsController',  '_legacy_link' => 'AdminMetricsController',  '_route' => 'metrics_page',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_metrics_page;
+                    }
+
+                    return $ret;
+                }
+                not_metrics_page:
+
+                // metrics_api_resolver
+                if (0 === strpos($pathinfo, '/modules/metrics/api') && preg_match('#^/modules/metrics/api(?:/(?P<query>[^/]++))?$#sD', $pathinfo, $matches)) {
+                    $ret = $this->mergeDefaults(array_replace($matches, ['_route' => 'metrics_api_resolver']), array (  'query' => '',  '_controller' => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsResolverController::resolve',));
+                    if (!in_array($canonicalMethod, ['GET', 'POST'])) {
+                        $allow = array_merge($allow, ['GET', 'POST']);
+                        goto not_metrics_api_resolver;
+                    }
+
+                    return $ret;
+                }
+                not_metrics_api_resolver:
+
+                // metrics_api_legacy_stats
+                if ('/modules/metrics/legacy/stats' === $pathinfo) {
+                    $ret = array (  '_controller' => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsLegacyStatsController::redirectToLegacyStats',  '_legacy_controller' => 'AdminMetricsLegacyStatsController',  '_legacy_link' => 'AdminMetricsLegacyStatsController',  '_route' => 'metrics_api_legacy_stats',);
+                    if (!in_array($canonicalMethod, ['GET'])) {
+                        $allow = array_merge($allow, ['GET']);
+                        goto not_metrics_api_legacy_stats;
+                    }
+
+                    return $ret;
+                }
+                not_metrics_api_legacy_stats:
+
+                // metrics_oauth
+                if ('/modules/metrics/oauth' === $pathinfo) {
+                    $ret = array (  '_controller' => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsOauthController::oauth',  '_route' => 'metrics_oauth',);
+                    if (!in_array($canonicalMethod, ['GET', 'POST'])) {
+                        $allow = array_merge($allow, ['GET', 'POST']);
+                        goto not_metrics_oauth;
+                    }
+
+                    return $ret;
+                }
+                not_metrics_oauth:
+
+                // metrics_graphql
+                if ('/modules/metrics/graphql' === $pathinfo) {
+                    $ret = array (  '_controller' => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsGraphqlController::execute',  '_route' => 'metrics_graphql',);
+                    if (!in_array($canonicalMethod, ['GET', 'POST'])) {
+                        $allow = array_merge($allow, ['GET', 'POST']);
+                        goto not_metrics_graphql;
+                    }
+
+                    return $ret;
+                }
+                not_metrics_graphql:
+
+            }
+
             // blockwishlist_configuration
             if ('/modules/blockwishlist/configuration' === $pathinfo) {
                 $ret = array (  '_controller' => 'PrestaShop\\Module\\BlockWishList\\Controller\\WishlistConfigurationAdminController::configurationAction',  '_legacy_controller' => 'WishlistConfigurationAdminController',  '_legacy_link' => 'WishlistConfigurationAdminController',  '_route' => 'blockwishlist_configuration',);
