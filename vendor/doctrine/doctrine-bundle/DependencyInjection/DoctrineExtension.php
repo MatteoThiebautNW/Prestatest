@@ -93,9 +93,9 @@ class DoctrineExtension extends AbstractDoctrineExtension
         $loader->load('dbal.xml');
 
         if (method_exists(Alias::class, 'setDeprecated')) {
-            $container->getAlias('Symfony\Bridge\Doctrine\RegistryInterface')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use `Doctrine\Persistence\ManagerRegistry` instead.');
-            $container->getAlias('Doctrine\Bundle\DoctrineBundle\Registry')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use `Doctrine\Persistence\ManagerRegistry` instead.');
-            $container->getAlias('Doctrine\Common\Persistence\ManagerRegistry')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use `Doctrine\Persistence\ManagerRegistry` instead.');
+            $container->getAlias('Symfony\Bridge\Doctrine\RegistryInterface')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use "Doctrine\Persistence\ManagerRegistry" instead.');
+            $container->getAlias('Doctrine\Bundle\DoctrineBundle\Registry')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use "Doctrine\Persistence\ManagerRegistry" instead.');
+            $container->getAlias('Doctrine\Common\Persistence\ManagerRegistry')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use "Doctrine\Persistence\ManagerRegistry" instead.');
         }
 
         if (empty($config['default_connection'])) {
@@ -355,7 +355,7 @@ class DoctrineExtension extends AbstractDoctrineExtension
         $loader->load('orm.xml');
 
         if (method_exists(Alias::class, 'setDeprecated')) {
-            $container->getAlias('Doctrine\Common\Persistence\ObjectManager')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use `Doctrine\ORM\EntityManagerInterface` instead.');
+            $container->getAlias('Doctrine\Common\Persistence\ObjectManager')->setDeprecated(true, 'The "%alias_id%" service alias is deprecated, use "Doctrine\ORM\EntityManagerInterface" instead.');
         }
 
         if (class_exists(AbstractType::class)) {
@@ -608,6 +608,8 @@ class DoctrineExtension extends AbstractDoctrineExtension
      *  entity_managers:
      *      default:
      *          second_level_cache:
+     *              region_lifetime: 3600
+     *              region_lock_lifetime: 60
      *              region_cache_driver: apc
      *              log_enabled: true
      *              regions:
@@ -640,7 +642,9 @@ class DoctrineExtension extends AbstractDoctrineExtension
         $regionsId  = sprintf('doctrine.orm.%s_second_level_cache.regions_configuration', $entityManager['name']);
         $driverId   = $driverId ?: sprintf('doctrine.orm.%s_second_level_cache.region_cache_driver', $entityManager['name']);
         $configDef  = $container->setDefinition($configId, new Definition('%doctrine.orm.second_level_cache.cache_configuration.class%'));
-        $regionsDef = $container->setDefinition($regionsId, new Definition('%doctrine.orm.second_level_cache.regions_configuration.class%'));
+        $regionsDef = $container
+            ->setDefinition($regionsId, new Definition('%doctrine.orm.second_level_cache.regions_configuration.class%'))
+            ->setArguments([$entityManager['second_level_cache']['region_lifetime'], $entityManager['second_level_cache']['region_lock_lifetime']]);
 
         $slcFactoryId = sprintf('doctrine.orm.%s_second_level_cache.default_cache_factory', $entityManager['name']);
         $factoryClass = isset($entityManager['second_level_cache']['factory']) ? $entityManager['second_level_cache']['factory'] : '%doctrine.orm.second_level_cache.default_cache_factory.class%';

@@ -29,7 +29,7 @@
 <div id="dbPart">
 	<h2><?php echo $this->translator->trans('Configure your database by filling out the following fields', array(), 'Install'); ?></h2>
 	<p>
-		<?php echo $this->translator->trans('To use PrestaShop, you must <a href="http://doc.prestashop.com/display/PS16/Installing+PrestaShop#InstallingPrestaShop-Creatingadatabaseforyourshop" target="_blank">create a database</a> to collect all of your store\'s data-related activities.', array(), 'Install'); ?>
+		<?php echo $this->translator->trans('To use PrestaShop, you must <a href="https://docs.prestashop-project.org/1.7-documentation/getting-started/installing-prestashop#creating-a-database-for-your-shop" target="_blank">create a database</a> to collect all of your store\'s data-related activities.', array(), 'Install'); ?>
 		<br />
 		<?php echo $this->translator->trans('Please complete the fields below in order for PrestaShop to connect to your database.', array(), 'Install'); ?>
 	</p>
@@ -52,14 +52,6 @@
 			<label for="dbPassword"><?php echo $this->translator->trans('Database password', array(), 'Install'); ?> </label>
 			<input class="text" size="10" type="password" id="dbPassword" name="dbPassword" value="<?php echo htmlspecialchars($this->database_password) ?>" />
 		</p>
-		<!--
-		<p>
-			<label for="dbEngine"><?php echo $this->translator->trans('Database Engine', array(), 'Install'); ?></label>
-			<select id="dbEngine" name="dbEngine">
-				<option value="InnoDB" <?php if ($this->database_engine == 'InnoDB'): ?>selected="selected"<?php endif; ?>>InnoDB</option>
-				<option value="MyISAM" <?php if ($this->database_engine == 'MyISAM'): ?>selected="selected"<?php endif; ?>>MyISAM</option>
-			</select>
-		</p>-->
 		<p>
 			<label for="db_prefix"><?php echo $this->translator->trans('Tables prefix', array(), 'Install'); ?></label>
 			<input class="text" type="text" id="db_prefix" name="db_prefix" value="<?php echo htmlspecialchars($this->database_prefix) ?>" />

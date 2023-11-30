@@ -47,6 +47,11 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
     private $filtersConverter;
 
     /**
+     * @var Filters\DataAccessor
+     */
+    private $dataAccessor;
+
+    /**
      * @var URLSerializer
      */
     private $urlSerializer;
@@ -60,11 +65,13 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
         Ps_Facetedsearch $module,
         Filters\Converter $converter,
         URLSerializer $serializer,
+        Filters\DataAccessor $dataAccessor,
         SearchFactory $searchFactory = null
     ) {
         $this->module = $module;
         $this->filtersConverter = $converter;
         $this->urlSerializer = $serializer;
+        $this->dataAccessor = $dataAccessor;
         $this->searchFactory = $searchFactory === null ? new SearchFactory() : $searchFactory;
     }
 
@@ -145,7 +152,8 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
         $filterBlockSearch = new Filters\Block(
             $facetedSearch->getSearchAdapter(),
             $context,
-            $this->module->getDatabase()
+            $this->module->getDatabase(),
+            $this->dataAccessor
         );
 
         $idShop = (int) $context->shop->id;
@@ -339,6 +347,8 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
      */
     private function labelRangeFilters(array $facets)
     {
+        $context = $this->module->getContext();
+
         foreach ($facets as $facet) {
             if (!in_array($facet->getType(), Filters\Converter::RANGE_FILTERS)) {
                 continue;
@@ -363,8 +373,8 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
                     $filter->setLabel(
                         sprintf(
                             '%1$s - %2$s',
-                            Tools::displayPrice($min),
-                            Tools::displayPrice($max)
+                            $context->getCurrentLocale()->formatPrice($min, $context->currency->iso_code),
+                            $context->getCurrentLocale()->formatPrice($max, $context->currency->iso_code)
                         )
                     );
                 }

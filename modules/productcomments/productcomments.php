@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Copyright since 2007 PrestaShop SA and Contributors
  * PrestaShop is an International Registered Trademark & Property of PrestaShop SA
@@ -27,7 +28,6 @@ if (!defined('_PS_VERSION_')) {
     exit;
 }
 
-use PrestaShop\Module\ProductComment\Addons\CategoryFetcher;
 use PrestaShop\Module\ProductComment\Repository\ProductCommentCriterionRepository;
 use PrestaShop\Module\ProductComment\Repository\ProductCommentRepository;
 use PrestaShop\PrestaShop\Core\Module\WidgetInterface;
@@ -45,7 +45,7 @@ class ProductComments extends Module implements WidgetInterface
     {
         $this->name = 'productcomments';
         $this->tab = 'front_office_features';
-        $this->version = '4.2.1';
+        $this->version = '5.0.2';
         $this->author = 'PrestaShop';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -80,12 +80,13 @@ class ProductComments extends Module implements WidgetInterface
             }
         }
 
-        if (parent::install() == false ||
+        if (
+            parent::install() == false ||
             !$this->registerHook('displayFooterProduct') || //Product page footer
-            !$this->registerHook('header') || //Adds css and javascript on front
+            !$this->registerHook('displayHeader') || //Adds css and javascript on front
             !$this->registerHook('displayProductListReviews') || //Product list miniature
             !$this->registerHook('displayProductAdditionalInfo') || //Display info in checkout column
-
+            !$this->registerHook('filterProductContent') || // Add infos to Product page
             !$this->registerHook('registerGDPRConsent') ||
             !$this->registerHook('actionDeleteGDPRCustomer') ||
             !$this->registerHook('actionExportGDPRData') ||
@@ -95,7 +96,8 @@ class ProductComments extends Module implements WidgetInterface
             !Configuration::updateValue('PRODUCT_COMMENTS_USEFULNESS', 1) ||
             !Configuration::updateValue('PRODUCT_COMMENTS_COMMENTS_PER_PAGE', 5) ||
             !Configuration::updateValue('PRODUCT_COMMENTS_ANONYMISATION', 0) ||
-            !Configuration::updateValue('PRODUCT_COMMENTS_MODERATE', 1)) {
+            !Configuration::updateValue('PRODUCT_COMMENTS_MODERATE', 1)
+        ) {
             return false;
         }
 
@@ -104,7 +106,8 @@ class ProductComments extends Module implements WidgetInterface
 
     public function uninstall($keep = true)
     {
-        if (!parent::uninstall() || ($keep && !$this->deleteTables()) ||
+        if (
+            !parent::uninstall() || ($keep && !$this->deleteTables()) ||
             !Configuration::deleteByName('PRODUCT_COMMENTS_MODERATE') ||
             !Configuration::deleteByName('PRODUCT_COMMENTS_COMMENTS_PER_PAGE') ||
             !Configuration::deleteByName('PRODUCT_COMMENTS_ANONYMISATION') ||
@@ -117,9 +120,10 @@ class ProductComments extends Module implements WidgetInterface
             !$this->unregisterHook('actionExportGDPRData') ||
 
             !$this->unregisterHook('displayProductAdditionalInfo') ||
-            !$this->unregisterHook('header') ||
+            !$this->unregisterHook('displayHeader') ||
             !$this->unregisterHook('displayFooterProduct') ||
-            !$this->unregisterHook('displayProductListReviews')) {
+            !$this->unregisterHook('displayProductListReviews')
+        ) {
             return false;
         }
 
@@ -258,9 +262,6 @@ class ProductComments extends Module implements WidgetInterface
             $this->_html .= $this->renderModerateLists();
             $this->_html .= $this->renderCriterionList();
             $this->_html .= $this->renderCommentsList();
-
-            $this->context->controller->addCss($this->_path . 'views/css/module-addons-suggestion.css');
-            $this->_html .= $this->renderAddonsSuggestion();
         }
 
         $this->_setBaseUrl();
@@ -297,17 +298,17 @@ class ProductComments extends Module implements WidgetInterface
                         'label' => $this->trans('All reviews must be validated by an employee', [], 'Modules.Productcomments.Admin'),
                         'name' => 'PRODUCT_COMMENTS_MODERATE',
                         'values' => [
-                                        [
-                                            'id' => 'active_on',
-                                            'value' => 1,
-                                            'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                        [
-                                            'id' => 'active_off',
-                                            'value' => 0,
-                                            'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                    ],
+                            [
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
+                            ],
+                            [
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
+                            ],
+                        ],
                     ],
                     [
                         'type' => 'switch',
@@ -315,17 +316,17 @@ class ProductComments extends Module implements WidgetInterface
                         'label' => $this->trans('Allow guest reviews', [], 'Modules.Productcomments.Admin'),
                         'name' => 'PRODUCT_COMMENTS_ALLOW_GUESTS',
                         'values' => [
-                                        [
-                                            'id' => 'active_on',
-                                            'value' => 1,
-                                            'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                        [
-                                            'id' => 'active_off',
-                                            'value' => 0,
-                                            'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                    ],
+                            [
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
+                            ],
+                            [
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
+                            ],
+                        ],
                     ],
                     [
                         'type' => 'switch',
@@ -379,10 +380,10 @@ class ProductComments extends Module implements WidgetInterface
                         'suffix' => 'comments',
                     ],
                 ],
-            'submit' => [
-                'title' => $this->trans('Save', [], 'Modules.Productcomments.Admin'),
-                'class' => 'btn btn-default pull-right',
-                'name' => 'submitModerate',
+                'submit' => [
+                    'title' => $this->trans('Save', [], 'Modules.Productcomments.Admin'),
+                    'class' => 'btn btn-default pull-right',
+                    'name' => 'submitModerate',
                 ],
             ],
         ];
@@ -435,6 +436,7 @@ class ProductComments extends Module implements WidgetInterface
             $helper->identifier = 'id_product_comment';
             $helper->title = $this->trans('Reviews waiting for approval', [], 'Modules.Productcomments.Admin');
             $helper->table = $this->name;
+            $helper->table_id = 'waiting-approval-productcomments-list';
             $helper->token = Tools::getAdminTokenLite('AdminModules');
             $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
             $helper->no_link = true;
@@ -459,6 +461,7 @@ class ProductComments extends Module implements WidgetInterface
         $helper->identifier = 'id_product_comment';
         $helper->title = $this->trans('Reported Reviews', [], 'Modules.Productcomments.Admin');
         $helper->table = $this->name;
+        $helper->table_id = 'reported-productcomments-list';
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
         $helper->no_link = true;
@@ -567,6 +570,7 @@ class ProductComments extends Module implements WidgetInterface
         $helper->identifier = 'id_product_comment';
         $helper->title = $this->trans('Approved Reviews', [], 'Modules.Productcomments.Admin');
         $helper->table = $this->name;
+        $helper->table_id = 'approved-productcomments-list';
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
         $helper->no_link = true;
@@ -588,24 +592,6 @@ class ProductComments extends Module implements WidgetInterface
         return $helper->generateList($comments, $fields_list);
     }
 
-    public function renderAddonsSuggestion()
-    {
-        $categoryFetcher = new CategoryFetcher(
-            480,
-            [
-                'name' => 'Customer reviews',
-                'link' => '/en/480-customer-reviews',
-                'description' => '<h2>Display customer reviews on your store!</h2>Customer reviews reassure your visitors and help you improve conversion! Encourage your customers to leave a review, display them, and do not forget to use rich snippets to show your products’ satisfaction ratings on search engines: they will be more visible!',
-            ]
-        );
-        $category = $categoryFetcher->getData($this->context->language->iso_code);
-        $this->context->smarty->assign([
-            'addons_category' => $category,
-        ]);
-
-        return $this->context->smarty->fetch('module:productcomments/views/templates/admin/addons-suggestion.tpl');
-    }
-
     public function getConfigFieldsValues()
     {
         return [
@@ -623,11 +609,11 @@ class ProductComments extends Module implements WidgetInterface
         $criterion = new ProductCommentCriterion($id);
 
         return [
-                    'name' => $criterion->name,
-                    'id_product_comment_criterion_type' => $criterion->id_product_comment_criterion_type,
-                    'active' => $criterion->active,
-                    'id_product_comment_criterion' => $criterion->id,
-                ];
+            'name' => $criterion->name,
+            'id_product_comment_criterion_type' => $criterion->id_product_comment_criterion_type,
+            'active' => $criterion->active,
+            'id_product_comment_criterion' => $criterion->id,
+        ];
     }
 
     public function getStandardFieldList()
@@ -637,39 +623,71 @@ class ProductComments extends Module implements WidgetInterface
                 'title' => $this->trans('ID', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'search' => false,
+                'class' => 'product-comment-id',
             ],
             'title' => [
                 'title' => $this->trans('Review title', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'search' => false,
+                'class' => 'product-comment-title',
             ],
             'content' => [
                 'title' => $this->trans('Review', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'search' => false,
+                'class' => 'product-comment-content',
             ],
             'grade' => [
                 'title' => $this->trans('Rating', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'suffix' => '/5',
                 'search' => false,
+                'class' => 'product-comment-rating',
             ],
             'customer_name' => [
                 'title' => $this->trans('Author', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'search' => false,
+                'class' => 'product-comment-author',
+                'callback' => 'renderAuthorName',
+                'callback_object' => $this,
             ],
             'name' => [
                 'title' => $this->trans('Product', [], 'Modules.Productcomments.Admin'),
                 'type' => 'text',
                 'search' => false,
+                'class' => 'product-comment-product-name',
             ],
             'date_add' => [
                 'title' => $this->trans('Time of publication', [], 'Modules.Productcomments.Admin'),
                 'type' => 'date',
                 'search' => false,
+                'class' => 'product-comment-date',
             ],
         ];
+    }
+
+    /**
+     * Renders author name for the list, with the link if the author is a customer.
+     *
+     * @param string $value
+     * @param array $row
+     *
+     * @return string
+     */
+    public function renderAuthorName($value, $row)
+    {
+        $value = htmlentities($value);
+        if (!empty($row['customer_id'])) {
+            $linkToCustomerProfile = $this->context->link->getAdminLink('AdminCustomers', false, [], [
+                'id_customer' => $row['customer_id'],
+                'viewcustomer' => 1,
+            ]);
+
+            return '<a href="' . $linkToCustomerProfile . '">' . $value . '</a>';
+        }
+
+        return $value;
     }
 
     public function renderCriterionForm($id_criterion = 0)
@@ -678,9 +696,9 @@ class ProductComments extends Module implements WidgetInterface
         $query = [];
         foreach ($types as $key => $value) {
             $query[] = [
-                    'id' => $key,
-                    'label' => $value,
-                ];
+                'id' => $key,
+                'label' => $value,
+            ];
         }
 
         $criterion = new ProductCommentCriterion((int) $id_criterion);
@@ -696,42 +714,42 @@ class ProductComments extends Module implements WidgetInterface
 
         if (version_compare(_PS_VERSION_, '1.6', '<')) {
             $field_category_tree = [
-                                    'type' => 'categories_select',
-                                    'name' => 'categoryBox',
-                                    'label' => $this->trans('Criterion will be restricted to the following categories', [], 'Modules.Productcomments.Admin'),
-                                    'category_tree' => $this->initCategoriesAssociation(null, $id_criterion),
-                                ];
+                'type' => 'categories_select',
+                'name' => 'categoryBox',
+                'label' => $this->trans('Criterion will be restricted to the following categories', [], 'Modules.Productcomments.Admin'),
+                'category_tree' => $this->initCategoriesAssociation(null, $id_criterion),
+            ];
         } else {
             $field_category_tree = [
-                            'type' => 'categories',
-                            'label' => $this->trans('Criterion will be restricted to the following categories', [], 'Modules.Productcomments.Admin'),
-                            'name' => 'categoryBox',
-                            'desc' => $this->trans('Mark the boxes of categories to which this criterion applies.', [], 'Modules.Productcomments.Admin'),
-                            'tree' => [
-                                'use_search' => false,
-                                'id' => 'categoryBox',
-                                'use_checkbox' => true,
-                                'selected_categories' => $selected_categories,
-                            ],
-                            //retro compat 1.5 for category tree
-                            'values' => [
-                                'trads' => [
-                                    'Root' => Category::getTopCategory(),
-                                    'selected' => $this->trans('Selected', [], 'Modules.Productcomments.Admin'),
-                                    'Collapse All' => $this->trans('Collapse All', [], 'Modules.Productcomments.Admin'),
-                                    'Expand All' => $this->trans('Expand All', [], 'Modules.Productcomments.Admin'),
-                                    'Check All' => $this->trans('Check All', [], 'Modules.Productcomments.Admin'),
-                                    'Uncheck All' => $this->trans('Uncheck All', [], 'Modules.Productcomments.Admin'),
-                                ],
-                                'selected_cat' => $selected_categories,
-                                'input_name' => 'categoryBox[]',
-                                'use_radio' => false,
-                                'use_search' => false,
-                                'disabled_categories' => [],
-                                'top_category' => Category::getTopCategory(),
-                                'use_context' => true,
-                            ],
-                        ];
+                'type' => 'categories',
+                'label' => $this->trans('Criterion will be restricted to the following categories', [], 'Modules.Productcomments.Admin'),
+                'name' => 'categoryBox',
+                'desc' => $this->trans('Mark the boxes of categories to which this criterion applies.', [], 'Modules.Productcomments.Admin'),
+                'tree' => [
+                    'use_search' => false,
+                    'id' => 'categoryBox',
+                    'use_checkbox' => true,
+                    'selected_categories' => $selected_categories,
+                ],
+                //retro compat 1.5 for category tree
+                'values' => [
+                    'trads' => [
+                        'Root' => Category::getTopCategory(),
+                        'selected' => $this->trans('Selected', [], 'Modules.Productcomments.Admin'),
+                        'Collapse All' => $this->trans('Collapse All', [], 'Modules.Productcomments.Admin'),
+                        'Expand All' => $this->trans('Expand All', [], 'Modules.Productcomments.Admin'),
+                        'Check All' => $this->trans('Check All', [], 'Modules.Productcomments.Admin'),
+                        'Uncheck All' => $this->trans('Uncheck All', [], 'Modules.Productcomments.Admin'),
+                    ],
+                    'selected_cat' => $selected_categories,
+                    'input_name' => 'categoryBox[]',
+                    'use_radio' => false,
+                    'use_search' => false,
+                    'disabled_categories' => [],
+                    'top_category' => Category::getTopCategory(),
+                    'use_context' => true,
+                ],
+            ];
         }
 
         $fields_form_1 = [
@@ -757,10 +775,10 @@ class ProductComments extends Module implements WidgetInterface
                         'name' => 'id_product_comment_criterion_type',
                         'label' => $this->trans('Application scope of the criterion', [], 'Modules.Productcomments.Admin'),
                         'options' => [
-                                        'query' => $query,
-                                        'id' => 'id',
-                                        'name' => 'label',
-                                    ],
+                            'query' => $query,
+                            'id' => 'id',
+                            'name' => 'label',
+                        ],
                     ],
                     $field_category_tree,
                     [
@@ -775,23 +793,23 @@ class ProductComments extends Module implements WidgetInterface
                         'label' => $this->trans('Active', [], 'Modules.Productcomments.Admin'),
                         'name' => 'active',
                         'values' => [
-                                        [
-                                            'id' => 'active_on',
-                                            'value' => 1,
-                                            'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                        [
-                                            'id' => 'active_off',
-                                            'value' => 0,
-                                            'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
-                                        ],
-                                    ],
+                            [
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->trans('Yes', [], 'Modules.Productcomments.Admin'),
+                            ],
+                            [
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->trans('No', [], 'Modules.Productcomments.Admin'),
+                            ],
+                        ],
                     ],
                 ],
-            'submit' => [
-                'title' => $this->trans('Save', [], 'Modules.Productcomments.Admin'),
-                'class' => 'btn btn-default pull-right',
-                'name' => 'submitEditCriterion',
+                'submit' => [
+                    'title' => $this->trans('Save', [], 'Modules.Productcomments.Admin'),
+                    'class' => 'btn btn-default pull-right',
+                    'name' => 'submitEditCriterion',
                 ],
             ],
         ];
@@ -867,7 +885,7 @@ class ProductComments extends Module implements WidgetInterface
     /**
      *  Inject the needed javascript and css files in the appropriate pages
      */
-    public function hookHeader()
+    public function hookDisplayHeader()
     {
         $jsList = [];
         $cssList = [];
@@ -901,6 +919,33 @@ class ProductComments extends Module implements WidgetInterface
     public function hookDisplayFooterProduct($params)
     {
         return $this->renderProductCommentsList($params['product']) . $this->renderProductCommentModal($params['product']);
+    }
+
+    /**
+     * Inject data about productcomments in the product object for frontoffice
+     *
+     * @param array $params
+     *
+     * @return array
+     */
+    public function hookFilterProductContent(array $params)
+    {
+        if (empty($params['object']->id)) {
+            return $params;
+        }
+        /** @var ProductCommentRepository $productCommentRepository */
+        $productCommentRepository = $this->context->controller->getContainer()->get('product_comment_repository');
+
+        $averageRating = $productCommentRepository->getAverageGrade($params['object']->id, (bool) Configuration::get('PRODUCT_COMMENTS_MODERATE'));
+        $nbComments = $productCommentRepository->getCommentsNumber($params['object']->id, (bool) Configuration::get('PRODUCT_COMMENTS_MODERATE'));
+
+        /* @phpstan-ignore-next-line */
+        $params['object']->productComments = [
+            'averageRating' => $averageRating,
+            'nbComments' => $nbComments,
+        ];
+
+        return $params;
     }
 
     /**
@@ -971,6 +1016,7 @@ class ProductComments extends Module implements WidgetInterface
             'moderation_active' => (int) Configuration::get('PRODUCT_COMMENTS_MODERATE'),
             'criterions' => $criterions,
             'product' => $product,
+            'id_module' => $this->id,
         ]);
 
         return $this->context->smarty->fetch('module:productcomments/views/templates/hook/post-comment-modal.tpl');
@@ -1010,7 +1056,9 @@ class ProductComments extends Module implements WidgetInterface
             $idProduct = $this->context->controller->getProduct()->id;
             $variables = $this->getWidgetVariables($hookName, ['id_product' => $idProduct]);
 
-            $filePath = 'quickview' === Tools::getValue('action') ? $tplHookPath . 'product-additional-info-quickview.tpl' : $tplHookPath . 'product-additional-info.tpl';
+            $filePath = 'quickview' === Tools::getValue('action')
+                ? $tplHookPath . 'product-additional-info-quickview.tpl'
+                : $tplHookPath . 'product-additional-info.tpl';
         }
 
         if (empty($variables) || empty($filePath)) {

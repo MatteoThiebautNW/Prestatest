@@ -113,7 +113,7 @@ class RequestSqlCore extends ObjectModel
      *
      * @param string $sql
      *
-     * @return bool
+     * @return array|bool
      */
     public function parsingSql($sql)
     {
@@ -226,10 +226,10 @@ class RequestSqlCore extends ObjectModel
     /**
      * Cut an join sentence.
      *
-     * @param $attrs
-     * @param $from
+     * @param array $attrs
+     * @param array $from
      *
-     * @return array|bool
+     * @return array
      */
     public function cutJoin($attrs, $from)
     {
@@ -239,8 +239,20 @@ class RequestSqlCore extends ObjectModel
             if (in_array($attr['expr_type'], ['operator', 'const'])) {
                 continue;
             }
-            if ($attribut = $this->cutAttribute($attr['base_expr'], $from)) {
-                $tab[] = $attribut;
+
+            if (!empty($attr['sub_tree'])) {
+                foreach ($attr['sub_tree'] as $treeItem) {
+                    if ($treeItem['expr_type'] !== 'colref') {
+                        continue;
+                    }
+                    if ($attribut = $this->cutAttribute($treeItem['base_expr'], $from)) {
+                        $tab[] = $attribut;
+                    }
+                }
+            } else {
+                if ($attribut = $this->cutAttribute($attr['base_expr'], $from)) {
+                    $tab[] = $attribut;
+                }
             }
         }
 
@@ -294,7 +306,10 @@ class RequestSqlCore extends ObjectModel
     {
         if ($alias) {
             foreach ($tables as $table) {
-                if (isset($table['alias'], $table['table']) && $table['alias']['no_quotes'] == $alias) {
+                if (!isset($table['alias']) || !isset($table['table'])) {
+                    continue;
+                }
+                if ($table['alias']['no_quotes'] == $alias || $table['alias']['no_quotes']['parts'][0] == $alias) {
                     return [$table['table']];
                 }
             }
@@ -328,7 +343,7 @@ class RequestSqlCore extends ObjectModel
      * Check if an attributes exists in a table.
      *
      * @param string $attr
-     * @param $table
+     * @param array $table
      *
      * @return bool
      */
@@ -393,7 +408,7 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "FROM" sentence.
      *
-     * @param string $from
+     * @param array $from
      *
      * @return bool
      */
@@ -409,7 +424,8 @@ class RequestSqlCore extends ObjectModel
                 return false;
             }
             if ($table['ref_type'] == 'ON' && (trim($table['join_type']) == 'LEFT' || trim($table['join_type']) == 'JOIN')) {
-                if ($attrs = $this->cutJoin($table['ref_clause'], $from)) {
+                $attrs = $this->cutJoin($table['ref_clause'], $from);
+                if (is_array($attrs)) {
                     foreach ($attrs as $attr) {
                         if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
                             $this->error_sql['checkedFrom']['attribut'] = [$attr['attribut'], implode(', ', $attr['table'])];
@@ -448,7 +464,7 @@ class RequestSqlCore extends ObjectModel
         $nb = count($select);
         for ($i = 0; $i < $nb; ++$i) {
             $attribut = $select[$i];
-            if ($attribut['base_expr'] != '*' && !preg_match('/\.*$/', $attribut['base_expr'])) {
+            if ($attribut['base_expr'] != '*' && !preg_match('/\.\*$/', $attribut['base_expr'])) {
                 if ($attribut['expr_type'] == 'colref') {
                     if ($attr = $this->cutAttribute(trim($attribut['base_expr']), $from)) {
                         if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
@@ -492,7 +508,7 @@ class RequestSqlCore extends ObjectModel
         $nb = count($where);
         for ($i = 0; $i < $nb; ++$i) {
             $attribut = $where[$i];
-            if ($attribut['expr_type'] == 'colref' || $attribut['expr_type'] == 'reserved') {
+            if ($attribut['expr_type'] == 'colref') {
                 if ($attr = $this->cutAttribute(trim($attribut['base_expr']), $from)) {
                     if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
                         $this->error_sql['checkedWhere']['attribut'] = [$attr['attribut'], implode(', ', $attr['table'])];
@@ -500,15 +516,15 @@ class RequestSqlCore extends ObjectModel
                         return false;
                     }
                 } else {
-                    if (isset($this->error_sql['returnNameTable'])) {
-                        $this->error_sql['checkedWhere'] = $this->error_sql['returnNameTable'];
+                    $this->error_sql['checkedWhere'] = $this->error_sql['returnNameTable'] ?? false;
 
-                        return false;
-                    } else {
-                        $this->error_sql['checkedWhere'] = false;
+                    return false;
+                }
+            } elseif ($attribut['expr_type'] == 'reserved') {
+                if ($attribut['base_expr'] !== 'EXISTS' || !isset($where[$i + 1]) || $where[$i + 1]['expr_type'] !== 'subquery') {
+                    $this->error_sql['checkedWhere'] = $this->error_sql['returnNameTable'] ?? false;
 
-                        return false;
-                    }
+                    return false;
                 }
             } elseif ($attribut['expr_type'] == 'operator') {
                 if (!in_array(strtoupper($attribut['base_expr']), $this->tested['operator'])) {
@@ -608,15 +624,15 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "GROUP BY" sentence.
      *
-     * @param string $group
-     * @param string $from
+     * @param array $group
+     * @param array $from
      *
      * @return bool
      */
     public function checkedGroupBy($group, $from)
     {
         $group = $group[0];
-        if ($group['type'] == 'expression') {
+        if ($group['expr_type'] == 'colref') {
             if ($attr = $this->cutAttribute(trim($group['base_expr']), $from)) {
                 if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
                     $this->error_sql['checkedGroupBy']['attribut'] = [$attr['attribut'], implode(', ', $attr['table'])];

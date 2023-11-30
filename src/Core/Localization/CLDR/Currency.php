@@ -144,7 +144,7 @@ final class Currency implements CurrencyInterface
             throw new LocalizationException(sprintf('Unknown display name: "%s"', print_r($countContext, true)));
         }
 
-        return $this->displayNames[$countContext];
+        return $this->displayNames[$countContext] ?? $this->isoCode;
     }
 
     /**
@@ -152,7 +152,7 @@ final class Currency implements CurrencyInterface
      *
      * @param string $type Possible value: "default" ("$") and "narrow" ("US$")
      *
-     * @return string The currency's symbol
+     * @return string|null The currency's symbol
      *
      * @throws LocalizationException When an invalid symbol type is passed
      */
@@ -166,6 +166,6 @@ final class Currency implements CurrencyInterface
             return $this->symbols[$type];
         }
 
-        return $this->symbols[CurrencyInterface::SYMBOL_TYPE_DEFAULT];
+        return $this->symbols[CurrencyInterface::SYMBOL_TYPE_DEFAULT] ?? null;
     }
 }

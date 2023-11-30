@@ -378,15 +378,14 @@ admin_orders_configure_product_pagination:
     expose: true
 
 admin_orders_display_customization_image:
-  path: /display-customization-image/{orderId}/{name}/{value}
+  path: /display-customization-image/{orderId}/{value}
   methods: [GET]
   defaults:
     _controller: PrestaShopBundle:Admin/Sell/Order/Order:displayCustomizationImage
     _legacy_controller: AdminOrders
   requirements:
     orderId: \d+
-    name: \w+
-    value: \w+
+    value: .+
 
 admin_orders_product_prices:
   path: /{orderId}/products/prices
@@ -407,3 +406,15 @@ admin_orders_products_search:
         _legacy_controller: AdminOrders
     options:
         expose: true
+
+admin_orders_set_internal_note:
+  path: /{orderId}/set-internal-note
+  methods: [POST]
+  defaults:
+    _controller: PrestaShopBundle:Admin/Sell/Order/Order:setInternalNote
+    _legacy_controller: AdminOrders
+    _legacy_link: AdminOrders:updateInternalNote
+    _legacy_parameters:
+      id_order: orderId
+  requirements:
+    orderId: \d+

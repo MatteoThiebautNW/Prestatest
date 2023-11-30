@@ -37,16 +37,12 @@ trait ResponseTrait
 {
     private $logger;
     private $headers = [];
+    private $canary;
 
     /**
      * @var callable|null A callback that initializes the two previous properties
      */
     private $initializer;
-
-    /**
-     * @var resource A php://temp stream typically
-     */
-    private $content;
 
     private $info = [
         'response_headers' => [],
@@ -55,10 +51,13 @@ trait ResponseTrait
         'canceled' => false,
     ];
 
-    /** @var resource */
+    /** @var object|resource */
     private $handle;
     private $id;
     private $timeout = 0;
+    private $inflate;
+    private $shouldBuffer;
+    private $content;
     private $finalInfo;
     private $offset = 0;
     private $jsonData;
@@ -69,8 +68,7 @@ trait ResponseTrait
     public function getStatusCode(): int
     {
         if ($this->initializer) {
-            ($this->initializer)($this);
-            $this->initializer = null;
+            self::initialize($this);
         }
 
         return $this->info['http_code'];
@@ -82,8 +80,7 @@ trait ResponseTrait
     public function getHeaders(bool $throw = true): array
     {
         if ($this->initializer) {
-            ($this->initializer)($this);
-            $this->initializer = null;
+            self::initialize($this);
         }
 
         if ($throw) {
@@ -99,8 +96,7 @@ trait ResponseTrait
     public function getContent(bool $throw = true): string
     {
         if ($this->initializer) {
-            ($this->initializer)($this);
-            $this->initializer = null;
+            self::initialize($this);
         }
 
         if ($throw) {
@@ -120,15 +116,13 @@ trait ResponseTrait
                 return $content;
             }
 
-            if ('HEAD' === $this->info['http_method'] || \in_array($this->info['http_code'], [204, 304], true)) {
-                return '';
+            if (null === $this->content) {
+                throw new TransportException('Cannot get the content of the response twice: buffering is disabled.');
             }
-
-            throw new TransportException('Cannot get the content of the response twice: buffering is disabled.');
-        }
-
-        foreach (self::stream([$this]) as $chunk) {
-            // Chunks are buffered in $this->content already
+        } else {
+            foreach (self::stream([$this]) as $chunk) {
+                // Chunks are buffered in $this->content already
+            }
         }
 
         rewind($this->content);
@@ -142,31 +136,25 @@ trait ResponseTrait
     public function toArray(bool $throw = true): array
     {
         if ('' === $content = $this->getContent($throw)) {
-            throw new TransportException('Response body is empty.');
+            throw new JsonException('Response body is empty.');
         }
 
         if (null !== $this->jsonData) {
             return $this->jsonData;
         }
 
-        $contentType = $this->headers['content-type'][0] ?? 'application/json';
-
-        if (!preg_match('/\bjson\b/i', $contentType)) {
-            throw new JsonException(sprintf('Response content-type is "%s" while a JSON-compatible one was expected.', $contentType));
-        }
-
         try {
-            $content = json_decode($content, true, 512, JSON_BIGINT_AS_STRING | (\PHP_VERSION_ID >= 70300 ? \JSON_THROW_ON_ERROR : 0));
+            $content = json_decode($content, true, 512, \JSON_BIGINT_AS_STRING | (\PHP_VERSION_ID >= 70300 ? \JSON_THROW_ON_ERROR : 0));
         } catch (\JsonException $e) {
-            throw new JsonException($e->getMessage(), $e->getCode());
+            throw new JsonException($e->getMessage().sprintf(' for "%s".', $this->getInfo('url')), $e->getCode());
         }
 
-        if (\PHP_VERSION_ID < 70300 && JSON_ERROR_NONE !== json_last_error()) {
-            throw new JsonException(json_last_error_msg(), json_last_error());
+        if (\PHP_VERSION_ID < 70300 && \JSON_ERROR_NONE !== json_last_error()) {
+            throw new JsonException(json_last_error_msg().sprintf(' for "%s".', $this->getInfo('url')), json_last_error());
         }
 
         if (!\is_array($content)) {
-            throw new JsonException(sprintf('JSON content was expected to decode to an array, %s returned.', \gettype($content)));
+            throw new JsonException(sprintf('JSON content was expected to decode to an array, "%s" returned for "%s".', \gettype($content), $this->getInfo('url')));
         }
 
         if (null !== $this->content) {
@@ -204,13 +192,31 @@ trait ResponseTrait
             $this->getHeaders($throw);
         }
 
-        return StreamWrapper::createResource($this, null, $this->content, $this->handle && 'stream' === get_resource_type($this->handle) ? $this->handle : null);
+        $stream = StreamWrapper::createResource($this);
+        stream_get_meta_data($stream)['wrapper_data']
+            ->bindHandles($this->handle, $this->content);
+
+        return $stream;
+    }
+
+    public function __sleep()
+    {
+        throw new \BadMethodCallException('Cannot serialize '.__CLASS__);
+    }
+
+    public function __wakeup()
+    {
+        throw new \BadMethodCallException('Cannot unserialize '.__CLASS__);
     }
 
     /**
      * Closes the response and all its network handles.
      */
-    abstract protected function close(): void;
+    private function close(): void
+    {
+        $this->canary->cancel();
+        $this->inflate = null;
+    }
 
     /**
      * Adds pending responses to the activity list.
@@ -227,10 +233,34 @@ trait ResponseTrait
      */
     abstract protected static function select(ClientState $multi, float $timeout): int;
 
+    private static function initialize(self $response): void
+    {
+        if (null !== $response->info['error']) {
+            throw new TransportException($response->info['error']);
+        }
+
+        try {
+            if (($response->initializer)($response)) {
+                foreach (self::stream([$response]) as $chunk) {
+                    if ($chunk->isFirst()) {
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Persist timeouts thrown during initialization
+            $response->info['error'] = $e->getMessage();
+            $response->close();
+            throw $e;
+        }
+
+        $response->initializer = null;
+    }
+
     private static function addResponseHeaders(array $responseHeaders, array &$info, array &$headers, string &$debug = ''): void
     {
         foreach ($responseHeaders as $h) {
-            if (11 <= \strlen($h) && '/' === $h[4] && preg_match('#^HTTP/\d+(?:\.\d+)? ([12345]\d\d) .*#', $h, $m)) {
+            if (11 <= \strlen($h) && '/' === $h[4] && preg_match('#^HTTP/\d+(?:\.\d+)? ([1-9]\d\d)(?: |$)#', $h, $m)) {
                 if ($headers) {
                     $debug .= "< \r\n";
                     $headers = [];
@@ -247,7 +277,7 @@ trait ResponseTrait
         $debug .= "< \r\n";
 
         if (!$info['http_code']) {
-            throw new TransportException('Invalid or missing HTTP status line.');
+            throw new TransportException(sprintf('Invalid or missing HTTP status line for "%s".', implode('', $info['url'])));
         }
     }
 
@@ -271,9 +301,10 @@ trait ResponseTrait
      */
     private function doDestruct()
     {
+        $this->shouldBuffer = true;
+
         if ($this->initializer && null === $this->info['error']) {
-            ($this->initializer)($this);
-            $this->initializer = null;
+            self::initialize($this);
             $this->checkStatusCode();
         }
     }
@@ -292,12 +323,12 @@ trait ResponseTrait
         }
 
         $lastActivity = microtime(true);
-        $isTimeout = false;
+        $elapsedTimeout = 0;
 
         while (true) {
             $hasActivity = false;
             $timeoutMax = 0;
-            $timeoutMin = $timeout ?? INF;
+            $timeoutMin = $timeout ?? \INF;
 
             /** @var ClientState $multi */
             foreach ($runningResponses as $i => [$multi]) {
@@ -314,7 +345,7 @@ trait ResponseTrait
                     } elseif (!isset($multi->openHandles[$j])) {
                         unset($responses[$j]);
                         continue;
-                    } elseif ($isTimeout) {
+                    } elseif ($elapsedTimeout >= $timeoutMax) {
                         $multi->handlesActivity[$j] = [new ErrorChunk($response->offset, sprintf('Idle timeout reached for "%s".', $response->getInfo('url')))];
                     } else {
                         continue;
@@ -322,11 +353,22 @@ trait ResponseTrait
 
                     while ($multi->handlesActivity[$j] ?? false) {
                         $hasActivity = true;
-                        $isTimeout = false;
+                        $elapsedTimeout = 0;
 
                         if (\is_string($chunk = array_shift($multi->handlesActivity[$j]))) {
-                            $response->offset += \strlen($chunk);
+                            if (null !== $response->inflate && false === $chunk = @inflate_add($response->inflate, $chunk)) {
+                                $multi->handlesActivity[$j] = [null, new TransportException(sprintf('Error while processing content unencoding for "%s".', $response->getInfo('url')))];
+                                continue;
+                            }
+
+                            if ('' !== $chunk && null !== $response->content && \strlen($chunk) !== fwrite($response->content, $chunk)) {
+                                $multi->handlesActivity[$j] = [null, new TransportException(sprintf('Failed writing %d bytes to the response buffer.', \strlen($chunk)))];
+                                continue;
+                            }
+
+                            $chunkLen = \strlen($chunk);
                             $chunk = new DataChunk($response->offset, $chunk);
+                            $response->offset += $chunkLen;
                         } elseif (null === $chunk) {
                             $e = $multi->handlesActivity[$j][0];
                             unset($responses[$j], $multi->handlesActivity[$j]);
@@ -341,16 +383,42 @@ trait ResponseTrait
 
                                 $chunk = new ErrorChunk($response->offset, $e);
                             } else {
+                                if (0 === $response->offset && null === $response->content) {
+                                    $response->content = fopen('php://memory', 'w+');
+                                }
+
                                 $chunk = new LastChunk($response->offset);
                             }
                         } elseif ($chunk instanceof ErrorChunk) {
                             unset($responses[$j]);
-                            $isTimeout = true;
+                            $elapsedTimeout = $timeoutMax;
                         } elseif ($chunk instanceof FirstChunk) {
                             if ($response->logger) {
                                 $info = $response->getInfo();
                                 $response->logger->info(sprintf('Response: "%s %s"', $info['http_code'], $info['url']));
                             }
+
+                            $response->inflate = \extension_loaded('zlib') && $response->inflate && 'gzip' === ($response->headers['content-encoding'][0] ?? null) ? inflate_init(\ZLIB_ENCODING_GZIP) : null;
+
+                            if ($response->shouldBuffer instanceof \Closure) {
+                                try {
+                                    $response->shouldBuffer = ($response->shouldBuffer)($response->headers);
+
+                                    if (null !== $response->info['error']) {
+                                        throw new TransportException($response->info['error']);
+                                    }
+                                } catch (\Throwable $e) {
+                                    $response->close();
+                                    $multi->handlesActivity[$j] = [null, $e];
+                                }
+                            }
+
+                            if (true === $response->shouldBuffer) {
+                                $response->content = fopen('php://temp', 'w+');
+                            } elseif (\is_resource($response->shouldBuffer)) {
+                                $response->content = $response->shouldBuffer;
+                            }
+                            $response->shouldBuffer = null;
 
                             yield $response => $chunk;
 
@@ -391,10 +459,11 @@ trait ResponseTrait
                 continue;
             }
 
-            switch (self::select($multi, $timeoutMin)) {
-                case -1: usleep(min(500, 1E6 * $timeoutMin)); break;
-                case 0: $isTimeout = microtime(true) - $lastActivity > $timeoutMax; break;
+            if (-1 === self::select($multi, min($timeoutMin, $timeoutMax - $elapsedTimeout))) {
+                usleep(min(500, 1E6 * $timeoutMin));
             }
+
+            $elapsedTimeout = microtime(true) - $lastActivity;
         }
     }
 }

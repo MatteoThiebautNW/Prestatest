@@ -45,6 +45,14 @@ class ImageManagerCore
         'image/x-png',
     ];
 
+    const EXTENSIONS_SUPPORTED = [
+        'gif',
+        'jpg',
+        'jpeg',
+        'jpe',
+        'png',
+    ];
+
     /**
      * Generate a cached thumbnail for object lists (eg. carrier, order statuses...etc).
      *
@@ -117,7 +125,7 @@ class ImageManagerCore
     /**
      * Check if memory limit is too long or not.
      *
-     * @param mixed $image
+     * @param string $image
      *
      * @return bool
      */

@@ -512,14 +512,18 @@ class AdminCustomerThreadsControllerCore extends AdminController
 
     public function initContent()
     {
-        if (isset($_GET['filename']) && file_exists(_PS_UPLOAD_DIR_ . $_GET['filename']) && Validate::isFileName($_GET['filename'])) {
-            AdminCustomerThreadsController::openUploadedFile();
+        if (isset($_GET['filename'])) {
+            if (file_exists(_PS_UPLOAD_DIR_ . $_GET['filename']) && Validate::isFileName($_GET['filename'])) {
+                $this->openUploadedFile(!Tools::getValue('show'));
+            } else {
+                Tools::redirect('404');
+            }
         }
 
         return parent::initContent();
     }
 
-    protected function openUploadedFile()
+    protected function openUploadedFile(bool $forceDownload = true)
     {
         $filename = $_GET['filename'];
 
@@ -553,7 +557,9 @@ class AdminCustomerThreadsControllerCore extends AdminController
             ob_end_clean();
         }
         header('Content-Type: ' . $extension);
-        header('Content-Disposition:attachment;filename="' . $filename . '"');
+        if ($forceDownload) {
+            header('Content-Disposition:attachment;filename="' . $filename . '"');
+        }
         readfile(_PS_UPLOAD_DIR_ . $filename);
         die;
     }
@@ -631,17 +637,27 @@ class AdminCustomerThreadsControllerCore extends AdminController
                 $employee = new Employee($mess['id_employee']);
                 $messages[$key]['employee_image'] = $employee->getImage();
             }
-            if (isset($mess['file_name']) && $mess['file_name'] != '') {
-                $messages[$key]['file_name'] = _THEME_PROD_PIC_DIR_ . $mess['file_name'];
-            } else {
+            if (empty($mess['file_name'])) {
                 unset($messages[$key]['file_name']);
+            } else {
+                $messages[$key]['file_link'] = $this->context->link->getAdminLink(
+                    'AdminCustomerThreads',
+                    true,
+                    [],
+                    [
+                        'id_customer_thread' => $id_customer_thread,
+                        'viewcustomer_thread' => '',
+                        'filename' => $mess['file_name'],
+                        'show' => true,
+                    ]
+                );
             }
 
             if ($mess['id_product']) {
                 $product = new Product((int) $mess['id_product'], false, $this->context->language->id);
                 if (Validate::isLoadedObject($product)) {
                     $messages[$key]['product_name'] = $product->name;
-                    $messages[$key]['product_link'] = $this->context->link->getAdminLink('AdminProducts') . '&updateproduct&id_product=' . (int) $product->id;
+                    $messages[$key]['product_link'] = $this->context->link->getAdminLink('AdminProducts', true, ['id_product' => (int) $product->id, 'updateproduct' => '1']);
                 }
             }
         }
@@ -955,7 +971,7 @@ class AdminCustomerThreadsControllerCore extends AdminController
         // Show the errors.
         if (isset($sync_errors['hasError']) && $sync_errors['hasError']) {
             if (isset($sync_errors['errors'])) {
-                foreach ($sync_errors['errors'] as &$error) {
+                foreach ($sync_errors['errors'] as $error) {
                     $this->displayWarning($error);
                 }
             }

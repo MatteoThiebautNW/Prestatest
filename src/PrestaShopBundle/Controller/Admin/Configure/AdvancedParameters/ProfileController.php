@@ -27,6 +27,7 @@
 namespace PrestaShopBundle\Controller\Admin\Configure\AdvancedParameters;
 
 use Exception;
+use ImageManager;
 use PrestaShop\PrestaShop\Core\Domain\Profile\Command\BulkDeleteProfileCommand;
 use PrestaShop\PrestaShop\Core\Domain\Profile\Command\DeleteProfileCommand;
 use PrestaShop\PrestaShop\Core\Domain\Profile\Exception\CannotDeleteSuperAdminProfileException;
@@ -37,6 +38,7 @@ use PrestaShop\PrestaShop\Core\Domain\Profile\Exception\ProfileNotFoundException
 use PrestaShop\PrestaShop\Core\Domain\Profile\ProfileSettings;
 use PrestaShop\PrestaShop\Core\Domain\Profile\Query\GetProfileForEditing;
 use PrestaShop\PrestaShop\Core\Domain\Profile\QueryResult\EditableProfile;
+use PrestaShop\PrestaShop\Core\Image\Uploader\Exception\UploadedImageConstraintException;
 use PrestaShop\PrestaShop\Core\Search\Filters\ProfileFilters;
 use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
 use PrestaShopBundle\Security\Annotation\AdminSecurity;
@@ -72,12 +74,17 @@ class ProfileController extends FrameworkBundleAdminController
                         'href' => $this->generateUrl('admin_profiles_create'),
                         'desc' => $this->trans('Add new profile', 'Admin.Advparameters.Feature'),
                         'icon' => 'add_circle_outline',
-                  ],
+                    ],
                 ],
                 'help_link' => $this->generateSidebarLink('AdminProfiles'),
                 'enableSidebar' => true,
                 'layoutTitle' => $this->trans('Profiles', 'Admin.Navigation.Menu'),
                 'grid' => $this->presentGrid($profilesGridFactory->getGrid($filters)),
+                'multistoreInfoTip' => $this->trans(
+                    'Note that this page is available in all shops context only, this is why your context has just switched.',
+                    'Admin.Notifications.Info'
+                ),
+                'multistoreIsUsed' => $this->get('prestashop.adapter.multistore_feature')->isUsed(),
             ]
         );
     }
@@ -142,6 +149,11 @@ class ProfileController extends FrameworkBundleAdminController
             'layoutTitle' => $this->trans('Add new profile', 'Admin.Advparameters.Feature'),
             'help_link' => $this->generateSidebarLink('AdminProfiles'),
             'enableSidebar' => true,
+            'multistoreInfoTip' => $this->trans(
+                'Note that this feature is available in all shops context only. It will be added to all your stores.',
+                'Admin.Notifications.Info'
+            ),
+            'multistoreIsUsed' => $this->get('prestashop.adapter.multistore_feature')->isUsed(),
         ]);
     }
 
@@ -166,8 +178,17 @@ class ProfileController extends FrameworkBundleAdminController
 
         try {
             $form = $formBuilder->getFormFor((int) $profileId);
-            $form->handleRequest($request);
+        } catch (Exception $exception) {
+            $this->addFlash(
+                'error',
+                $this->getErrorMessageForException($exception, $this->getErrorMessages())
+            );
 
+            return $this->redirectToRoute('admin_profiles_index');
+        }
+
+        try {
+            $form->handleRequest($request);
             $handlerResult = $formHandler->handleFor((int) $profileId, $form);
 
             if ($handlerResult->isSubmitted() && $handlerResult->isValid()) {
@@ -183,8 +204,8 @@ class ProfileController extends FrameworkBundleAdminController
             }
         }
 
-        /** @var EditableProfile $editableProfiler */
-        $editableProfiler = $this->getQueryBus()->handle(new GetProfileForEditing((int) $profileId));
+        /** @var EditableProfile $editableProfile */
+        $editableProfile = $this->getQueryBus()->handle(new GetProfileForEditing((int) $profileId));
 
         return $this->render('@PrestaShop/Admin/Configure/AdvancedParameters/Profiles/edit.html.twig', [
             'profileForm' => $form->createView(),
@@ -192,11 +213,12 @@ class ProfileController extends FrameworkBundleAdminController
                 'Edit: %value%',
                 'Admin.Catalog.Feature',
                 [
-                    '%value%' => $editableProfiler->getLocalizedNames()[$this->getContextLangId()],
+                    '%value%' => $editableProfile->getLocalizedNames()[$this->getContextLangId()],
                 ]
             ),
             'help_link' => $this->generateSidebarLink('AdminProfiles'),
             'enableSidebar' => true,
+            'editableProfile' => $editableProfile,
         ]);
     }
 
@@ -266,6 +288,11 @@ class ProfileController extends FrameworkBundleAdminController
     protected function getErrorMessages()
     {
         return [
+            UploadedImageConstraintException::class => $this->trans(
+                'Image format not recognized, allowed formats are: %s',
+                'Admin.Notifications.Error',
+                [implode(', ', ImageManager::EXTENSIONS_SUPPORTED)]
+            ),
             ProfileConstraintException::class => [
                 ProfileConstraintException::INVALID_NAME => $this->trans(
                     'This field cannot be longer than %limit% characters (incl. HTML tags)',

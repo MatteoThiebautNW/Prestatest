@@ -145,6 +145,7 @@ final class GetCartForViewingHandler implements GetCartForViewingHandlerInterfac
                 Product::addProductCustomizationPrice($product, $customized_datas);
             }
         }
+        unset($product);
 
         $customerStats = $customer->getStats();
         $gender = new Gender($customer->id_gender, $context->language->id);
@@ -220,7 +221,8 @@ final class GetCartForViewingHandler implements GetCartForViewingHandlerInterfac
                 'unit_price' => $product['product_price'],
                 'total_price_formatted' => $this->locale->formatPrice($product['product_total'], $currency->iso_code),
                 'unit_price_formatted' => $this->locale->formatPrice($product['product_price'], $currency->iso_code),
-                'image' => $this->imageManager->getThumbnailForListing($image['id_image']),
+                // it is possible that there is no image for product, so we don't show anything, but at least avoid breaking whole page
+                'image' => isset($image['id_image']) ? $this->imageManager->getThumbnailForListing($image['id_image']) : '',
             ];
 
             if (isset($product['customizationQuantityTotal'])) {

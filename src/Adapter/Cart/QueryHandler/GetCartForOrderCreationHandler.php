@@ -33,10 +33,9 @@ use Cart;
 use CartRule;
 use Currency;
 use Customer;
-use Language;
 use Link;
 use Message;
-use PrestaShop\Decimal\Number;
+use PrestaShop\Decimal\DecimalNumber;
 use PrestaShop\PrestaShop\Adapter\Cart\AbstractCartHandler;
 use PrestaShop\PrestaShop\Adapter\ContextStateManager;
 use PrestaShop\PrestaShop\Core\Domain\Cart\Exception\CartNotFoundException;
@@ -56,6 +55,7 @@ use PrestaShopException;
 use Product;
 use Shop;
 use Symfony\Component\Translation\TranslatorInterface;
+use Tools;
 
 /**
  * Handles GetCartForOrderCreation query using legacy object models
@@ -121,7 +121,7 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
     {
         $cart = $this->getCart($query->getCartId());
         $currency = new Currency($cart->id_currency);
-        $language = new Language($cart->id_lang);
+        $language = $cart->getAssociatedLanguage();
 
         $this->contextStateManager
             ->setCart($cart)
@@ -135,10 +135,10 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
             $addresses = $this->getAddresses($cart);
 
             if ($query->hideDiscounts()) {
-                $legacySummary = $cart->getSummaryDetails($cart->id_lang, true);
+                $legacySummary = $cart->getSummaryDetails($cart->getAssociatedLanguage()->getId(), true);
                 $products = $this->extractProductsWithGiftSplitFromLegacySummary($cart, $legacySummary, $currency);
             } else {
-                $legacySummary = $cart->getRawSummaryDetails($cart->id_lang, true);
+                $legacySummary = $cart->getRawSummaryDetails($cart->getAssociatedLanguage()->getId(), true);
                 $products = $this->extractProductsFromLegacySummary($cart, $legacySummary, $currency);
             }
 
@@ -152,8 +152,6 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
                 $this->extractSummaryFromLegacySummary($legacySummary, $currency, $cart),
                 $addresses ? $this->extractShippingFromLegacySummary($cart, $legacySummary, $query->hideDiscounts()) : null
             );
-
-            $this->contextStateManager->restorePreviousContext();
         } finally {
             $this->contextStateManager->restorePreviousContext();
         }
@@ -171,7 +169,7 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
         $customer = new Customer($cart->id_customer);
         $cartAddresses = [];
 
-        foreach ($customer->getAddresses($cart->id_lang) as $data) {
+        foreach ($customer->getAddresses($cart->getAssociatedLanguage()->getId()) as $data) {
             $addressId = (int) $data['id_address'];
             $cartAddresses[$addressId] = $this->buildCartAddress($addressId, $cart);
         }
@@ -230,21 +228,21 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
                 (int) $discount['id_cart_rule'],
                 $discount['name'],
                 $discount['description'],
-                (new Number((string) $discount['value_tax_exc']))->round($currency->precision)
+                (new DecimalNumber((string) $discount['value_tax_exc']))->round($currency->precision)
             );
         }
 
         if ($hideDiscounts) {
             foreach ($cart->getCartRules(CartRule::FILTER_ACTION_GIFT) as $giftRule) {
                 $giftRuleId = (int) $giftRule['id_cart_rule'];
-                $finalValue = new Number((string) $giftRule['value_tax_exc']);
+                $finalValue = new DecimalNumber((string) $giftRule['value_tax_exc']);
 
                 if (isset($cartRules[$giftRuleId])) {
                     // it is possible that one cart rule can have a gift product, but also have other conditions,
                     //so we need to sum their reduction values
                     /** @var CartForOrderCreation\CartRule $cartRule */
                     $cartRule = $cartRules[$giftRuleId];
-                    $finalValue = $finalValue->plus(new Number($cartRule->getValue()));
+                    $finalValue = $finalValue->plus(new DecimalNumber($cartRule->getValue()));
                 }
 
                 $cartRules[$giftRuleId] = new CartForOrderCreation\CartRule(
@@ -443,7 +441,7 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
             $this->contextLink->getPageLink(
                 'order',
                 false,
-                (int) $cart->id_lang,
+                (int) $cart->getAssociatedLanguage()->getId(),
                 http_build_query([
                     'step' => 3,
                     'recover_cart' => $cartId,
@@ -471,7 +469,7 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
 
         $customizations = Product::getAllCustomizedDatas(
             $cart->id,
-            $cart->id_lang,
+            $cart->getAssociatedLanguage()->getId(),
             true,
             null,
             $customizationId
@@ -533,7 +531,6 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
      * @param Cart $cart
      * @param Currency $currency
      * @param array $product
-     * @param bool $isGift
      *
      * @return CartProduct
      */
@@ -548,11 +545,16 @@ final class GetCartForOrderCreationHandler extends AbstractCartHandler implement
             $product['name'],
             isset($product['attributes_small']) ? $product['attributes_small'] : '',
             $product['reference'],
-            \Tools::ps_round($product['price'], $currency->precision),
+            Tools::ps_round($product['price'], $currency->precision),
             $product['quantity'],
-            \Tools::ps_round($product['total'], $currency->precision),
+            Tools::ps_round($product['total'], $currency->precision),
             $this->contextLink->getImageLink($product['link_rewrite'], $product['id_image'], 'small_default'),
             $this->getProductCustomizedData($cart, $product),
+            Product::getQuantity(
+                (int) $product['id_product'],
+                isset($product['id_product_attribute']) ? (int) $product['id_product_attribute'] : null
+            ),
+            Product::isAvailableWhenOutOfStock((int) $product['out_of_stock']) !== 0,
             !empty($product['is_gift'])
         );
     }

@@ -41,7 +41,13 @@ class AdminCartRulesControllerCore extends AdminController
 
         parent::__construct();
 
-        $this->bulk_actions = ['delete' => ['text' => $this->trans('Delete selected', [], 'Admin.Actions'), 'icon' => 'icon-trash', 'confirm' => $this->trans('Delete selected items?', [], 'Admin.Notifications.Warning')]];
+        $this->bulk_actions = [
+            'delete' => [
+                'text' => $this->trans('Delete selected', [], 'Admin.Actions'),
+                'icon' => 'icon-trash',
+                'confirm' => $this->trans('Delete selected items?', [], 'Admin.Notifications.Warning'),
+            ],
+        ];
 
         $this->fields_list = [
             'id_cart_rule' => ['title' => $this->trans('ID', [], 'Admin.Global'), 'align' => 'center', 'class' => 'fixed-width-xs'],
@@ -174,9 +180,9 @@ class AdminCartRulesControllerCore extends AdminController
                     // Add a new rule group
                     $rule_group_id = 1;
                     if (is_array($rule_group_array)) {
-                        // Empty for (with a ; at the end), that just find the first rule_group_id available in rule_group_array
-                        for ($rule_group_id = 1; in_array($rule_group_id, $rule_group_array); ++$rule_group_id) {
-                            42;
+                        // Find the first rule_group_id that is not available in the array
+                        while (in_array($rule_group_id, $rule_group_array)) {
+                            ++$rule_group_id;
                         }
                         $_POST['product_rule_group'][] = $rule_group_id;
                     } else {
@@ -239,7 +245,7 @@ class AdminCartRulesControllerCore extends AdminController
     {
         $res = parent::processDelete();
         if (Tools::isSubmit('delete' . $this->table)) {
-            $back = urldecode(Tools::getValue('back', ''));
+            $back = rawurldecode(Tools::getValue('back', ''));
             if (!empty($back)) {
                 $this->redirect_after = $back;
             }
@@ -570,7 +576,9 @@ class AdminCartRulesControllerCore extends AdminController
                 $combinations = [];
                 $productObj = new Product((int) $product['id_product'], false, (int) $this->context->language->id);
                 $attributes = $productObj->getAttributesGroups((int) $this->context->language->id);
-                $product['formatted_price'] = $this->context->getCurrentLocale()->formatPrice(Tools::convertPrice($product['price_tax_incl'], $this->context->currency), $this->context->currency->iso_code);
+                $product['formatted_price'] = $product['price_tax_incl']
+                    ? $this->context->getCurrentLocale()->formatPrice(Tools::convertPrice($product['price_tax_incl'], $this->context->currency), $this->context->currency->iso_code)
+                    : '';
 
                 foreach ($attributes as $attribute) {
                     if (!isset($combinations[$attribute['id_product_attribute']]['attributes'])) {
@@ -581,7 +589,9 @@ class AdminCartRulesControllerCore extends AdminController
                     $combinations[$attribute['id_product_attribute']]['default_on'] = $attribute['default_on'];
                     if (!isset($combinations[$attribute['id_product_attribute']]['price'])) {
                         $price_tax_incl = Product::getPriceStatic((int) $product['id_product'], true, $attribute['id_product_attribute']);
-                        $combinations[$attribute['id_product_attribute']]['formatted_price'] = $this->context->getCurrentLocale()->formatPrice(Tools::convertPrice($price_tax_incl, $this->context->currency), $this->context->currency->iso_code);
+                        $combinations[$attribute['id_product_attribute']]['formatted_price'] = $price_tax_incl
+                            ? $this->context->getCurrentLocale()->formatPrice(Tools::convertPrice($price_tax_incl, $this->context->currency), $this->context->currency->iso_code)
+                            : '';
                     }
                 }
 
@@ -757,5 +767,62 @@ class AdminCartRulesControllerCore extends AdminController
             $found = true;
         }
         echo json_encode(['found' => $found, 'vouchers' => $vouchers]);
+    }
+
+    /**
+     * For the listing, Override the method displayDeleteLink for the HelperList
+     * That allows to have links with all characters (like < & >)
+     *
+     * @param string $token
+     * @param string $id
+     * @param string|null $name
+     *
+     * @return string
+     */
+    public function displayDeleteLink(string $token, string $id, ?string $name = null): string
+    {
+        if (!$this->access('delete')) {
+            return '';
+        }
+
+        $tpl = $this->createTemplate('helpers/list/list_action_delete.tpl');
+
+        if (!array_key_exists('Delete', self::$cache_lang)) {
+            self::$cache_lang['Delete'] = $this->trans('Delete', [], 'Admin.Actions');
+        }
+        if (!array_key_exists('DeleteItem', self::$cache_lang)) {
+            self::$cache_lang['DeleteItem'] = $this->trans('Delete selected item?', [], 'Admin.Notifications.Info');
+        }
+        if (!array_key_exists('Name', self::$cache_lang)) {
+            self::$cache_lang['Name'] = $this->trans('Name:', [], 'Admin.Shipping.Feature');
+        }
+
+        if (null !== $name) {
+            // \n\n is not between double quotes because in js/jquery/plugins/alerts/jquery.alerts.js, \n is replaced by <br>.
+            $name = '\n\n' . self::$cache_lang['Name'] . ' ' . $name;
+        }
+
+        $data = [
+            $this->identifier => $id,
+            'href' => $this->context->link->getAdminLink(
+                'AdminCartRules',
+                true, [],
+                [
+                    'id_cart_rule' => (int) $id,
+                    'deletecart_rule' => 1,
+                ]
+            ),
+            'action' => self::$cache_lang['Delete'],
+        ];
+
+        if ($this->specificConfirmDelete !== false) {
+            $data['confirm'] = null !== $this->specificConfirmDelete
+                ? '\r' . $this->specificConfirmDelete
+                : Tools::htmlentitiesDecodeUTF8(self::$cache_lang['DeleteItem'] . $name);
+        }
+
+        $tpl->assign(array_merge($this->tpl_delete_link_vars, $data));
+
+        return $tpl->fetch();
     }
 }

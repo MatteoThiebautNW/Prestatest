@@ -27,24 +27,34 @@
 namespace PrestaShopBundle\Form\Admin\Configure\AdvancedParameters\RequestSql;
 
 use PrestaShop\PrestaShop\Core\Encoding\CharsetEncoding;
-use Symfony\Component\Form\AbstractType;
+use PrestaShopBundle\Form\Admin\Type\SwitchType;
+use PrestaShopBundle\Form\Admin\Type\TranslatorAwareType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\FormBuilderInterface;
 
 /**
  * Class RequestSqlSettingsType build form type for "Configure > Advanced Parameters > Database > SQL Manager" page.
  */
-class SqlRequestSettingsType extends AbstractType
+class SqlRequestSettingsType extends TranslatorAwareType
 {
     public function buildForm(FormBuilderInterface $builder, array $options)
     {
         $builder
             ->add('default_file_encoding', ChoiceType::class, [
+                'label' => $this->trans('Select your default file encoding', 'Admin.Advparameters.Feature'),
                 'choices' => [
                     CharsetEncoding::UTF_8 => CharsetEncoding::UTF_8,
                     CharsetEncoding::ISO_8859_1 => CharsetEncoding::ISO_8859_1,
                 ],
                 'translation_domain' => false,
-            ]);
+            ])
+            ->add('enable_multi_statements', SwitchType::class, [
+                'label' => $this->trans('Enable multi-statements queries', 'Admin.Advparameters.Feature'),
+                'help' => $this->trans(
+                    'Enabling multi-statements queries increases the risk of SQL injection vulnerability to be exploited',
+                    'Admin.Advparameters.Help'
+                ),
+            ])
+        ;
     }
 }

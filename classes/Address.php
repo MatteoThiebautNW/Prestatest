@@ -104,8 +104,12 @@ class AddressCore extends ObjectModel
 
     /** @var array Zone IDs cache */
     protected static $_idZones = [];
+
     /** @var array Country IDs cache */
     protected static $_idCountries = [];
+
+    /** @var array<int, bool> Store if an adress ID exists */
+    protected static $addressExists = [];
 
     /**
      * @see ObjectModel::$definition
@@ -177,6 +181,7 @@ class AddressCore extends ObjectModel
     {
         static::$_idZones = [];
         static::$_idCountries = [];
+        static::$addressExists = [];
     }
 
     /**
@@ -191,6 +196,9 @@ class AddressCore extends ObjectModel
         if (Validate::isUnsignedId($this->id_customer)) {
             Customer::resetAddressCache($this->id_customer, $this->id);
         }
+
+        // Update the cache
+        static::$addressExists[$this->id] = true;
 
         return true;
     }
@@ -207,6 +215,9 @@ class AddressCore extends ObjectModel
         if (isset(self::$_idZones[$this->id])) {
             unset(self::$_idZones[$this->id]);
         }
+
+        // Update the cache
+        static::$addressExists[$this->id] = true;
 
         if (Validate::isUnsignedId($this->id_customer)) {
             Customer::resetAddressCache($this->id_customer, $this->id);
@@ -231,6 +242,11 @@ class AddressCore extends ObjectModel
 
         if (!$this->isUsed()) {
             $this->deleteCartAddress();
+
+            // Update the cache
+            if (isset(static::$addressExists[$this->id])) {
+                static::$addressExists[$this->id] = false;
+            }
 
             return parent::delete();
         } else {
@@ -303,7 +319,13 @@ class AddressCore extends ObjectModel
 			LEFT JOIN `' . _DB_PREFIX_ . 'state` s ON s.`id_state` = a.`id_state`
 			WHERE a.`id_address` = ' . (int) $id_address);
 
-        self::$_idZones[$id_address] = (int) ((int) $result['id_zone_state'] ? $result['id_zone_state'] : $result['id_zone']);
+        if (empty($result['id_zone_state']) && empty($result['id_zone'])) {
+            return false;
+        }
+
+        self::$_idZones[$id_address] = !empty($result['id_zone_state'])
+            ? (int) $result['id_zone_state']
+            : (int) $result['id_zone'];
 
         return self::$_idZones[$id_address];
     }
@@ -431,20 +453,28 @@ class AddressCore extends ObjectModel
      * Specify if an address is already in base.
      *
      * @param int $id_address Address id
+     * @param bool $useCache Use Cache for optimizing queries
      *
      * @return bool The address exists
      */
-    public static function addressExists($id_address)
+    public static function addressExists($id_address, bool $useCache = false)
     {
-        $key = 'address_exists_' . (int) $id_address;
-        if (!Cache::isStored($key)) {
-            $id_address = Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue('SELECT `id_address` FROM ' . _DB_PREFIX_ . 'address a WHERE a.`id_address` = ' . (int) $id_address);
-            Cache::store($key, (bool) $id_address);
-
-            return (bool) $id_address;
+        if ((int) $id_address <= 0) {
+            return false;
         }
 
-        return Cache::retrieve($key);
+        if ($useCache && isset(static::$addressExists[$id_address])) {
+            return static::$addressExists[$id_address];
+        }
+
+        static::$addressExists[$id_address] = (bool) Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue(
+            'SELECT `id_address`
+            FROM ' . _DB_PREFIX_ . 'address a
+            WHERE a.`id_address` = ' . (int) $id_address,
+            false
+        );
+
+        return static::$addressExists[$id_address];
     }
 
     /**
@@ -602,7 +632,7 @@ class AddressCore extends ObjectModel
         $query->where('id_customer = ' . (int) $id_customer);
         $query->where('deleted = 0');
 
-        return Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($query);
+        return Db::getInstance(_PS_USE_SQL_SLAVE_)->getValue($query, false);
     }
 
     /**

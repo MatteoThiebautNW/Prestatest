@@ -202,14 +202,17 @@ class OrderLazyArray extends AbstractLazyArray
 
             foreach ($cartProducts['products'] as $cartProduct) {
                 if (($cartProduct['id_product'] === $orderProduct['id_product'])
-                    && ($cartProduct['id_product_attribute'] === $orderProduct['id_product_attribute'])) {
+                    && ($cartProduct['id_product_attribute'] === $orderProduct['id_product_attribute'])
+                ) {
                     if (isset($cartProduct['attributes'])) {
                         $orderProduct['attributes'] = $cartProduct['attributes'];
                     } else {
                         $orderProduct['attributes'] = [];
                     }
                     $orderProduct['cover'] = $cartProduct['cover'];
+                    $orderProduct['default_image'] = $cartProduct['default_image'];
                     $orderProduct['unit_price_full'] = $cartProduct['unit_price_full'];
+                    break;
                 }
             }
 
@@ -218,7 +221,7 @@ class OrderLazyArray extends AbstractLazyArray
 
         $orderProducts = $this->cartPresenter->addCustomizedData($orderProducts, $cart);
 
-        return $orderProducts;
+        return $this->addOrderReferenceToCustomizationFileUrls($orderProducts);
     }
 
     /**
@@ -298,7 +301,9 @@ class OrderLazyArray extends AbstractLazyArray
         $historyList = $order->getHistory($context->language->id, false, true);
 
         foreach ($historyList as $historyId => $history) {
-            if ($history['id_order_state'] == $order->current_state) {
+            // HistoryList only contains order states that are not hidden to customers, the last visible order state,
+            // that is to say the one we get in the first iteration
+            if ($historyId === array_key_first($historyList)) {
                 $historyId = 'current';
             }
             $orderHistory[$historyId] = $history;
@@ -350,7 +355,7 @@ class OrderLazyArray extends AbstractLazyArray
     {
         $order = $this->order;
 
-        $carrier = new Carrier((int) $order->id_carrier, (int) $order->id_lang);
+        $carrier = new Carrier((int) $order->id_carrier, (int) $order->getAssociatedLanguage()->getId());
         $orderCarrier = $this->objectPresenter->present($carrier);
         $orderCarrier['name'] = ($carrier->name == '0') ? Configuration::get('PS_SHOP_NAME') : $carrier->name;
         $orderCarrier['delay'] = $carrier->delay;
@@ -442,7 +447,7 @@ class OrderLazyArray extends AbstractLazyArray
             'color' => '',
             'unremovable' => '',
             'hidden' => '',
-            'logable' => '',
+            'loggable' => '',
             'delivery' => '',
             'shipped' => '',
             'paid' => '',
@@ -459,5 +464,40 @@ class OrderLazyArray extends AbstractLazyArray
             'history_date' => '',
             'contrast' => '',
         ];
+    }
+
+    private function addOrderReferenceToCustomizationFileUrls(array $products): array
+    {
+        /**
+         * @param array|string $url
+         *
+         * @return array|string
+         */
+        $addReferenceFunction = function ($imageUrl) use (&$addReferenceFunction) {
+            if (is_array($imageUrl)) {
+                foreach ($imageUrl as $key => $url) {
+                    $imageUrl[$key] = $addReferenceFunction($url);
+                }
+            } else {
+                // deconstruct the url and rebuild it with the reference query added
+                $parsedUrl = parse_url($imageUrl);
+                parse_str($parsedUrl['query'] ?? '', $parsedQuery);
+                $newQuery = http_build_query(array_merge($parsedQuery, ['reference' => $this->order->reference]));
+                $imageUrl = http_build_url(array_merge($parsedUrl, ['query' => $newQuery]));
+            }
+
+            return $imageUrl;
+        };
+        foreach ($products as &$product) {
+            foreach ($product['customizations'] as &$customization) {
+                foreach ($customization['fields'] as &$field) {
+                    if ($field['type'] === 'image') {
+                        $field['image'] = $addReferenceFunction($field['image']);
+                    }
+                }
+            }
+        }
+
+        return $products;
     }
 }

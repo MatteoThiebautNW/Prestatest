@@ -23,8 +23,10 @@
  * @copyright Since 2007 PrestaShop SA and Contributors
  * @license   https://opensource.org/licenses/OSL-3.0 Open Software License (OSL 3.0)
  */
+
 use PrestaShopBundle\Install\Database;
 use PrestaShopBundle\Install\Install;
+use Symfony\Component\Filesystem\Filesystem;
 
 class InstallControllerConsoleProcess extends InstallControllerConsole implements HttpConfigureInterface
 {
@@ -67,6 +69,8 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         // Clean all cache values
         Cache::clean('*');
 
+        Configuration::set('PS_SHOP_DEFAULT', 1);
+        Shop::initialize();
         Context::getContext()->shop = new Shop(1);
         Shop::setContext(Shop::CONTEXT_SHOP, 1);
         Configuration::loadConfiguration();
@@ -161,13 +165,14 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
             }
         }
 
-        if (in_array('fixtures', $steps)) {
+        if (in_array('fixtures', $steps) && $this->datas->fixtures) {
             if (!$this->processInstallFixtures()) {
                 $this->printErrors();
             }
         }
 
         // Update fixtures lang
+        $this->rebootWithoutTranslationsCache();
         foreach (Language::getLanguages() as $lang) {
             Language::updateMultilangTable($lang['iso_code']);
         }
@@ -343,5 +348,18 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         global $kernel;
         $kernel = new AppKernel(_PS_ENV_, _PS_MODE_DEV_);
         $kernel->boot();
+    }
+
+    /**
+     * Delete translations cache and reboot the kernel so newly installed languages are took into account
+     *
+     * This method is only useful in CLI as everything is done in a single call but not with the web ui
+     * because the whole cache gets cleared before translating the fixtures
+     */
+    private function rebootWithoutTranslationsCache()
+    {
+        global $kernel;
+        (new Filesystem())->remove($kernel->getCacheDir() . 'translations');
+        $kernel->reboot($kernel->getCacheDir());
     }
 }
