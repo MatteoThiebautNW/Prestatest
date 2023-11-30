@@ -494,12 +494,4 @@ abstract class Minify
             throw new IOException('The file "'.$path.'" could not be written to. Check your disk space and file permissions.');
         }
     }
-
-    protected static function str_replace_first($search, $replace, $subject) {
-        $pos = strpos($subject, $search);
-        if ($pos !== false) {
-            return substr_replace($subject, $replace, $pos, strlen($search));
-        }
-        return $subject;
-    }
 }

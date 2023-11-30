@@ -29,7 +29,7 @@ use PrestaShop\TranslationToolsBundle\Translation\Helper\DomainHelper;
 
 $template_dirs = array(_PS_THEME_DIR_.'templates');
 $plugin_dirs = array(_PS_THEME_DIR_.'plugins');
-if (_PS_PARENT_THEME_DIR_) {
+if (_PS_PARENT_THEME_DIR_ !== '') {
     $template_dirs[] = _PS_PARENT_THEME_DIR_.'templates';
     $plugin_dirs[] = _PS_PARENT_THEME_DIR_.'plugins';
 }
@@ -38,14 +38,14 @@ $smarty->setTemplateDir($template_dirs);
 $smarty->addPluginsDir($plugin_dirs);
 
 $module_resources = array('theme' => _PS_THEME_DIR_.'modules/');
-if (_PS_PARENT_THEME_DIR_) {
+if (_PS_PARENT_THEME_DIR_ !== '') {
     $module_resources['parent'] = _PS_PARENT_THEME_DIR_.'modules/';
 }
 $module_resources['modules'] = _PS_MODULE_DIR_;
 $smarty->registerResource('module', new SmartyResourceModule($module_resources));
 
 $parent_resources = array();
-if (_PS_PARENT_THEME_DIR_) {
+if (_PS_PARENT_THEME_DIR_ !== '') {
     $parent_resources['parent'] = _PS_PARENT_THEME_DIR_.'templates/';
 }
 $smarty->registerResource('parent', new SmartyResourceParent($parent_resources));
@@ -231,7 +231,7 @@ function smartyTranslate($params, $smarty)
     }
 
     if ($params['mod']) {
-        return Translate::smartyPostProcessTranslation(
+        return Translate::postProcessTranslation(
             Translate::getModuleTranslation(
                 $params['mod'],
                 $params['s'],
@@ -242,7 +242,7 @@ function smartyTranslate($params, $smarty)
             $params
         );
     } elseif ($params['pdf']) {
-        return Translate::smartyPostProcessTranslation(
+        return Translate::postProcessTranslation(
             Translate::getPdfTranslation(
                 $params['s'],
                 $params['sprintf']
@@ -269,5 +269,5 @@ function smartyTranslate($params, $smarty)
         $msg = Translate::checkAndReplaceArgs($msg, $params['sprintf']);
     }
 
-    return Translate::smartyPostProcessTranslation($params['js'] ? $msg : Tools::safeOutput($msg), $params);
+    return Translate::postProcessTranslation($params['js'] ? $msg : Tools::safeOutput($msg), $params);
 }

@@ -62,11 +62,21 @@ class TaxRulesGroupCore extends ObjectModel
 
     protected static $_taxes = [];
 
+    /**
+     * @param bool $null_values
+     *
+     * @return bool
+     *
+     * @throws PrestaShopDatabaseException
+     * @throws PrestaShopException
+     */
     public function update($null_values = false)
     {
         if (!$this->deleted && $this->isUsed()) {
             $current_tax_rules_group = new TaxRulesGroup((int) $this->id);
-            if ((!$new_tax_rules_group = $current_tax_rules_group->duplicateObject()) || !$current_tax_rules_group->historize($new_tax_rules_group)) {
+            /** @var TaxRulesGroup|false $new_tax_rules_group */
+            $new_tax_rules_group = $current_tax_rules_group->duplicateObject();
+            if (!$new_tax_rules_group || !$current_tax_rules_group->historize($new_tax_rules_group)) {
                 return false;
             }
 
@@ -134,7 +144,7 @@ class TaxRulesGroupCore extends ObjectModel
 
     public static function getTaxRulesGroups($only_active = true)
     {
-        return static::getTaxRulesGroupsData($only_active);
+        return self::getTaxRulesGroupsData($only_active);
     }
 
     /**
@@ -185,11 +195,12 @@ class TaxRulesGroupCore extends ObjectModel
                 INNER JOIN ' . _DB_PREFIX_ . 'tax_rule tr
                 ON g.id_tax_rules_group = tr.id_tax_rules_group
                 INNER JOIN ' . _DB_PREFIX_ . 'tax t
-                ON tr.id_tax = t.id_tax
+                ON (tr.id_tax = t.id_tax AND t.active = 1)
             ';
         }
 
         $sql .= Shop::addSqlAssociation('tax_rules_group', 'g') . ' WHERE g.deleted = 0'
+            . ($onlyActive ? ' AND g.`active` = 1' : '')
             . ($onlyActive ? ' AND g.`active` = 1' : '')
             . ' ORDER BY name ASC';
 
@@ -236,7 +247,7 @@ class TaxRulesGroupCore extends ObjectModel
      */
     public static function getIdByName($name)
     {
-        return Db::getInstance()->getValue(
+        return (int) Db::getInstance()->getValue(
             'SELECT `id_tax_rules_group`
 			FROM `' . _DB_PREFIX_ . 'tax_rules_group` rg
 			WHERE `name` = \'' . pSQL($name) . '\''
@@ -263,31 +274,5 @@ class TaxRulesGroupCore extends ObjectModel
 		FROM `' . _DB_PREFIX_ . 'order_detail`
 		WHERE `id_tax_rules_group` = ' . (int) $this->id
         );
-    }
-
-    /**
-     * @deprecated since 1.5
-     */
-    public static function getTaxesRate($id_tax_rules_group, $id_country, $id_state, $zipcode)
-    {
-        Tools::displayAsDeprecated();
-        $rate = 0;
-        foreach (TaxRulesGroup::getTaxes($id_tax_rules_group, $id_country, $id_state, $zipcode) as $tax) {
-            $rate += (float) $tax->rate;
-        }
-
-        return $rate;
-    }
-
-    /**
-     * Return taxes associated to this para.
-     *
-     * @deprecated since 1.5
-     */
-    public static function getTaxes($id_tax_rules_group, $id_country, $id_state, $id_county)
-    {
-        Tools::displayAsDeprecated();
-
-        return [];
     }
 }

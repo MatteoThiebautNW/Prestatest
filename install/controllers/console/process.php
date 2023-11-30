@@ -30,8 +30,18 @@ use Symfony\Component\Filesystem\Filesystem;
 
 class InstallControllerConsoleProcess extends InstallControllerConsole implements HttpConfigureInterface
 {
-    public $process_steps = array();
+    public $process_steps = [];
     public $previous_button = false;
+
+    /**
+     * @var Install
+     */
+    protected $model_install;
+
+    /**
+     * @var Database
+     */
+    protected $model_database;
 
     public function init()
     {
@@ -51,7 +61,6 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
 
     public function display()
     {
-
     }
 
     /**
@@ -75,18 +84,18 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         Shop::setContext(Shop::CONTEXT_SHOP, 1);
         Configuration::loadConfiguration();
         if (!isset(Context::getContext()->language) || !Validate::isLoadedObject(Context::getContext()->language)) {
-            if ($id_lang = (int)Configuration::get('PS_LANG_DEFAULT')) {
+            if ($id_lang = (int) Configuration::get('PS_LANG_DEFAULT')) {
                 Context::getContext()->language = new Language($id_lang);
             }
         }
         if (!isset(Context::getContext()->country) || !Validate::isLoadedObject(Context::getContext()->country)) {
-            if ($id_country = (int)Configuration::get('PS_COUNTRY_DEFAULT')) {
-                Context::getContext()->country = new Country((int)$id_country);
+            if ($id_country = (int) Configuration::get('PS_COUNTRY_DEFAULT')) {
+                Context::getContext()->country = new Country((int) $id_country);
             }
         }
         if (!isset(Context::getContext()->currency) || !Validate::isLoadedObject(Context::getContext()->currency)) {
-            if ($id_currency = (int)Configuration::get('PS_CURRENCY_DEFAULT')) {
-                Context::getContext()->currency = new Currency((int)$id_currency);
+            if ($id_currency = Currency::getDefaultCurrencyId()) {
+                Context::getContext()->currency = new Currency((int) $id_currency);
             }
         }
 
@@ -95,7 +104,7 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         if (!defined('_PS_SMARTY_FAST_LOAD_')) {
             define('_PS_SMARTY_FAST_LOAD_', true);
         }
-        require_once _PS_ROOT_DIR_.'/config/smarty.config.inc.php';
+        require_once _PS_ROOT_DIR_ . '/config/smarty.config.inc.php';
 
         Context::getContext()->smarty = $smarty;
     }
@@ -106,7 +115,11 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         $this->clearConfigXML() && $this->clearConfigThemes();
         $steps = explode(',', $this->datas->step);
         if (in_array('all', $steps)) {
-            $steps = array('database','fixtures','theme','modules','addons_modules');
+            $steps = ['database', 'modules', 'theme', 'fixtures', 'postInstall'];
+        }
+        if (!file_exists(PS_INSTALLATION_LOCK_FILE)) {
+            // Set the install lock file
+            file_put_contents(PS_INSTALLATION_LOCK_FILE, '1');
         }
 
         if (in_array('database', $steps)) {
@@ -128,12 +141,13 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
             )) {
                 $this->printErrors();
             }
-            if (!$this->processInstallDatabase()) {
-                $this->printErrors();
-            }
 
             // Deferred Kernel Init
             $this->initKernel();
+
+            if (!$this->processInstallDatabase()) {
+                $this->printErrors();
+            }
 
             if (!$this->processInstallDefaultData()) {
                 $this->printErrors();
@@ -147,26 +161,26 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
             }
         }
 
-        if (in_array('modules', $steps)) {
-            if (!$this->processInstallModules()) {
-                $this->printErrors();
-            }
-        }
-
-        if (in_array('addons_modules', $steps)) {
-            if (!$this->processInstallAddonsModules()) {
-                $this->printErrors();
-            }
-        }
-
         if (in_array('theme', $steps)) {
             if (!$this->processInstallTheme()) {
                 $this->printErrors();
             }
         }
 
+        if (in_array('modules', $steps)) {
+            if (!$this->processInstallModules()) {
+                $this->printErrors();
+            }
+        }
+
         if (in_array('fixtures', $steps) && $this->datas->fixtures) {
             if (!$this->processInstallFixtures()) {
+                $this->printErrors();
+            }
+        }
+
+        if (in_array('postInstall', $steps)) {
+            if (!$this->processPostInstall()) {
                 $this->printErrors();
             }
         }
@@ -209,7 +223,7 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
     public function processInstallDefaultData()
     {
         $this->initializeContext();
-        if (!$res = $this->model_install->installDefaultData($this->datas->shop_name, $this->datas->shop_country, (int)$this->datas->all_languages, true)) {
+        if (!$res = $this->model_install->installDefaultData($this->datas->shop_name, $this->datas->shop_country, (int) $this->datas->all_languages, true)) {
             return false;
         }
 
@@ -246,7 +260,7 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
     {
         $this->initializeContext();
 
-        return $this->model_install->configureShop(array(
+        return $this->model_install->configureShop([
             'shop_name' => $this->datas->shop_name,
             'shop_activity' => $this->datas->shop_activity,
             'shop_country' => $this->datas->shop_country,
@@ -259,7 +273,7 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
             'configuration_agrement' => true,
             'enable_ssl' => $this->datas->enable_ssl,
             'rewrite_engine' => $this->datas->rewrite_engine,
-        ));
+        ]);
     }
 
     /**
@@ -269,8 +283,13 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
     public function processInstallModules()
     {
         $this->initializeContext();
+        if (is_string($this->datas->modules)) {
+            $modules = explode(',', $this->datas->modules);
+        } else {
+            $modules = array_keys($this->model_install->getModulesOnDisk());
+        }
 
-        return $this->model_install->installModules();
+        return $this->model_install->installModules($modules);
     }
 
     /**
@@ -286,19 +305,18 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
         }
 
         $this->model_install->xml_loader_ids = $this->datas->xml_loader_ids;
-        $result = $this->model_install->installFixtures(null, array('shop_activity' => $this->datas->shop_activity, 'shop_country' => $this->datas->shop_country));
+        $result = $this->model_install->installFixtures(null, ['shop_activity' => $this->datas->shop_activity, 'shop_country' => $this->datas->shop_country]);
         $this->datas->xml_loader_ids = $this->model_install->xml_loader_ids;
 
         return $result;
     }
 
     /**
-     * PROCESS : installModulesAddons
-     * Install modules from addons
+     * Process post install execution
      */
-    public function processInstallAddonsModules()
+    public function processPostInstall(): bool
     {
-        return $this->model_install->installModulesAddons();
+        return $this->model_install->postInstall();
     }
 
     /**
@@ -314,12 +332,12 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
 
     private function clearConfigXML()
     {
-        $configXMLPath = _PS_ROOT_DIR_.'/config/xml/';
+        $configXMLPath = _PS_ROOT_DIR_ . '/config/xml/';
         $cacheFiles = scandir($configXMLPath, SCANDIR_SORT_NONE);
         $excludes = ['.htaccess', 'index.php'];
 
-        foreach($cacheFiles as $file) {
-            $filepath = $configXMLPath.$file;
+        foreach ($cacheFiles as $file) {
+            $filepath = $configXMLPath . $file;
             if (is_file($filepath) && !in_array($file, $excludes)) {
                 unlink($filepath);
             }
@@ -328,10 +346,10 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
 
     private function clearConfigThemes()
     {
-        $themesPath = _PS_ROOT_DIR_.'/config/themes/';
+        $themesPath = _PS_ROOT_DIR_ . '/config/themes/';
         $cacheFiles = scandir($themesPath, SCANDIR_SORT_NONE);
-        foreach($cacheFiles as $file) {
-            $file = $themesPath.$file;
+        foreach ($cacheFiles as $file) {
+            $file = $themesPath . $file;
             if (is_file($file)) {
                 unlink($file);
             }
@@ -343,7 +361,7 @@ class InstallControllerConsoleProcess extends InstallControllerConsole implement
      */
     private function initKernel()
     {
-        require_once _PS_CORE_DIR_.'/config/bootstrap.php';
+        require_once _PS_CORE_DIR_ . '/config/bootstrap.php';
 
         global $kernel;
         $kernel = new AppKernel(_PS_ENV_, _PS_MODE_DEV_);

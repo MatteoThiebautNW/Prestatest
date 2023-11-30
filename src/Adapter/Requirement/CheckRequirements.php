@@ -27,7 +27,7 @@
 namespace PrestaShop\PrestaShop\Adapter\Requirement;
 
 use ConfigurationTest;
-use Symfony\Component\Translation\TranslatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Check system requirements of a PrestaShop website.
@@ -56,9 +56,7 @@ class CheckRequirements
     {
         $paramsRequiredResults = ConfigurationTest::check(ConfigurationTest::getDefaultTests());
 
-        $isHostMode = defined('_PS_HOST_MODE_');
-
-        $paramsOptionalResults = !$isHostMode ? ConfigurationTest::check(ConfigurationTest::getDefaultTestsOp()) : [];
+        $paramsOptionalResults = ConfigurationTest::check(ConfigurationTest::getDefaultTestsOp());
 
         $failRequired = in_array('fail', $paramsRequiredResults);
 
@@ -71,21 +69,18 @@ class CheckRequirements
             }
         }
 
-        $testsErrors = $this->fillMissingDescriptions($testsErrors, $paramsRequiredResults);
+        $testsErrors = array_merge(
+            $this->fillMissingDescriptions($testsErrors, $paramsRequiredResults),
+            $this->fillMissingDescriptions($testsErrors, $paramsOptionalResults)
+        );
 
         $results = [
             'failRequired' => $failRequired,
             'testsErrors' => $testsErrors,
             'testsRequired' => $paramsRequiredResults,
+            'failOptional' => in_array('fail', $paramsOptionalResults),
+            'testsOptional' => $paramsOptionalResults,
         ];
-
-        if (!$isHostMode) {
-            $results = array_merge($results, [
-                'testsErrors' => $this->fillMissingDescriptions($testsErrors, $paramsOptionalResults),
-                'failOptional' => in_array('fail', $paramsOptionalResults),
-                'testsOptional' => $paramsOptionalResults,
-            ]);
-        }
 
         return $results;
     }

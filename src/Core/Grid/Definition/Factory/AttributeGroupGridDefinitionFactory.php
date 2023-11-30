@@ -35,8 +35,8 @@ use PrestaShop\PrestaShop\Core\Grid\Action\Type\SimpleGridAction;
 use PrestaShop\PrestaShop\Core\Grid\Column\ColumnCollection;
 use PrestaShop\PrestaShop\Core\Grid\Column\Type\Common\ActionColumn;
 use PrestaShop\PrestaShop\Core\Grid\Column\Type\Common\BulkActionColumn;
+use PrestaShop\PrestaShop\Core\Grid\Column\Type\Common\DataColumn;
 use PrestaShop\PrestaShop\Core\Grid\Column\Type\Common\PositionColumn;
-use PrestaShop\PrestaShop\Core\Grid\Column\Type\DataColumn;
 use PrestaShop\PrestaShop\Core\Grid\Filter\Filter;
 use PrestaShop\PrestaShop\Core\Grid\Filter\FilterCollection;
 use PrestaShopBundle\Form\Admin\Type\SearchAndResetType;
@@ -48,10 +48,10 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class AttributeGroupGridDefinitionFactory extends AbstractFilterableGridDefinitionFactory
 {
-    public const GRID_ID = 'attribute_group';
-
     use BulkDeleteActionTrait;
     use DeleteActionTrait;
+
+    public const GRID_ID = 'attribute_group';
 
     /**
      * {@inheritdoc}

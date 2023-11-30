@@ -25,12 +25,28 @@
  */
 class CmsControllerCore extends FrontController
 {
+    public const CMS_CASE_PAGE = 1;
+    public const CMS_CASE_CATEGORY = 2;
+
+    /** @var string */
     public $php_self = 'cms';
     public $assignCase;
+
+    /**
+     * @deprecated Since 8.1, it will become protected in next major version. Use getCms() method instead.
+     *
+     * @var CMS|null
+     */
     public $cms;
 
-    /** @var CMSCategory */
+    /**
+     * @deprecated Since 8.1, it will become protected in next major version. Use getCmsCategory() method instead.
+     *
+     * @var CMSCategory|null
+     */
     public $cms_category;
+
+    /** @var bool */
     public $ssl = false;
 
     public function canonicalRedirection($canonicalURL = '')
@@ -64,17 +80,16 @@ class CmsControllerCore extends FrontController
 
         $this->canonicalRedirection();
 
-        // assignCase (1 = CMS page, 2 = CMS category)
         if (Validate::isLoadedObject($this->cms)) {
             $adtoken = Tools::getAdminToken('AdminCmsContent' . (int) Tab::getIdFromClassName('AdminCmsContent') . (int) Tools::getValue('id_employee'));
             if (!$this->cms->isAssociatedToShop() || !$this->cms->active && Tools::getValue('adtoken') != $adtoken) {
                 $this->redirect_after = '404';
                 $this->redirect();
             } else {
-                $this->assignCase = 1;
+                $this->assignCase = self::CMS_CASE_PAGE;
             }
         } elseif (Validate::isLoadedObject($this->cms_category) && $this->cms_category->active) {
-            $this->assignCase = 2;
+            $this->assignCase = self::CMS_CASE_CATEGORY;
         } else {
             $this->redirect_after = '404';
             $this->redirect();
@@ -88,7 +103,7 @@ class CmsControllerCore extends FrontController
      */
     public function initContent()
     {
-        if ($this->assignCase == 1) {
+        if ($this->assignCase == self::CMS_CASE_PAGE) {
             $cmsVar = $this->objectPresenter->present($this->cms);
 
             $filteredCmsContent = Hook::exec(
@@ -117,7 +132,7 @@ class CmsControllerCore extends FrontController
                 'cms/page',
                 ['entity' => 'cms', 'id' => $this->cms->id]
             );
-        } elseif ($this->assignCase == 2) {
+        } elseif ($this->assignCase == self::CMS_CASE_CATEGORY) {
             $cmsCategoryVar = $this->getTemplateVarCategoryCms();
 
             $filteredCmsCategoryContent = Hook::exec(
@@ -135,7 +150,10 @@ class CmsControllerCore extends FrontController
             }
 
             $this->context->smarty->assign($cmsCategoryVar);
-            $this->setTemplate('cms/category');
+            $this->setTemplate(
+                'cms/category',
+                ['entity' => 'cms_category', 'id' => $this->cms_category->id]
+            );
         }
         parent::initContent();
     }
@@ -153,7 +171,7 @@ class CmsControllerCore extends FrontController
     {
         $breadcrumb = parent::getBreadcrumbLinks();
 
-        if ($this->assignCase == 2) {
+        if ($this->assignCase == self::CMS_CASE_CATEGORY) {
             $cmsCategory = new CMSCategory($this->cms_category->id_cms_category);
         } else {
             $cmsCategory = new CMSCategory($this->cms->id_cms_category);
@@ -161,15 +179,17 @@ class CmsControllerCore extends FrontController
 
         if ($cmsCategory->id_parent != 0) {
             foreach (array_reverse($cmsCategory->getParentsCategories()) as $category) {
-                $cmsSubCategory = new CMSCategory($category['id_cms_category']);
-                $breadcrumb['links'][] = [
-                    'title' => $cmsSubCategory->getName(),
-                    'url' => $this->context->link->getCMSCategoryLink($cmsSubCategory),
-                ];
+                if ($category['active']) {
+                    $cmsSubCategory = new CMSCategory($category['id_cms_category']);
+                    $breadcrumb['links'][] = [
+                        'title' => $cmsSubCategory->getName(),
+                        'url' => $this->context->link->getCMSCategoryLink($cmsSubCategory),
+                    ];
+                }
             }
         }
 
-        if ($this->assignCase == 1) {
+        if ($this->assignCase == self::CMS_CASE_PAGE && $this->context->controller instanceof CmsControllerCore) {
             $breadcrumb['links'][] = [
                 'title' => $this->context->controller->cms->meta_title,
                 'url' => $this->context->link->getCMSLink($this->context->controller->cms),
@@ -183,7 +203,7 @@ class CmsControllerCore extends FrontController
     {
         $page = parent::getTemplateVarPage();
 
-        if ($this->assignCase == 2) {
+        if ($this->assignCase == self::CMS_CASE_CATEGORY) {
             $page['body_classes']['cms-id-' . $this->cms_category->id] = true;
         } else {
             $page['body_classes']['cms-id-' . $this->cms->id] = true;
@@ -214,5 +234,21 @@ class CmsControllerCore extends FrontController
         }
 
         return $categoryCms;
+    }
+
+    /**
+     * @return CMS|null
+     */
+    public function getCms()
+    {
+        return $this->cms;
+    }
+
+    /**
+     * @return CMSCategory|null
+     */
+    public function getCmsCategory()
+    {
+        return $this->cms_category;
     }
 }

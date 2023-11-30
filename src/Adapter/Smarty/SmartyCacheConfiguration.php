@@ -98,7 +98,6 @@ class SmartyCacheConfiguration implements DataConfigurationInterface
             $configuration['template_compilation'],
             $configuration['cache'],
             $configuration['multi_front_optimization'],
-            $configuration['caching_type'],
             $configuration['clear_cache'],
             $configuration['smarty_console'],
             $configuration['smarty_console_key']
@@ -119,6 +118,8 @@ class SmartyCacheConfiguration implements DataConfigurationInterface
 
         $cleanedContent = false;
         $file = self::CUSTOM_DEFINES_FILE;
+        $content = '';
+
         if (is_readable(self::CUSTOM_DEFINES_FILE)) {
             $content = file_get_contents(self::CUSTOM_DEFINES_FILE);
             $cleanedContent = php_strip_whitespace(self::CUSTOM_DEFINES_FILE);

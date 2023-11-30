@@ -59,12 +59,13 @@ class RequestSqlCore extends ObjectModel
         ],
         'unauthorized' => [
             'DELETE', 'ALTER', 'INSERT', 'REPLACE', 'CREATE', 'TRUNCATE', 'OPTIMIZE', 'GRANT', 'REVOKE', 'SHOW', 'HANDLER',
-            'LOAD', 'ROLLBACK', 'SAVEPOINT', 'UNLOCK', 'INSTALL', 'UNINSTALL', 'ANALZYE', 'BACKUP', 'CHECK', 'CHECKSUM', 'REPAIR', 'RESTORE', 'CACHE',
+            'LOAD', 'LOAD_FILE', 'ROLLBACK', 'SAVEPOINT', 'UNLOCK', 'INSTALL', 'UNINSTALL', 'ANALZYE', 'BACKUP', 'CHECK', 'CHECKSUM', 'REPAIR', 'RESTORE', 'CACHE',
             'DESCRIBE', 'EXPLAIN', 'USE', 'HELP', 'SET', 'DUPLICATE', 'VALUES',  'INTO', 'RENAME', 'CALL', 'PROCEDURE',  'FUNCTION', 'DATABASE', 'SERVER',
             'LOGFILE', 'DEFINER', 'RETURNS', 'EVENT', 'TABLESPACE', 'VIEW', 'TRIGGER', 'DATA', 'DO', 'PASSWORD', 'USER', 'PLUGIN', 'FLUSH', 'KILL',
             'RESET', 'START', 'STOP', 'PURGE', 'EXECUTE', 'PREPARE', 'DEALLOCATE', 'LOCK', 'USING', 'DROP', 'FOR', 'UPDATE', 'BEGIN', 'BY', 'ALL', 'SHARE',
             'MODE', 'TO', 'KEY', 'DISTINCTROW', 'DISTINCT',  'HIGH_PRIORITY', 'LOW_PRIORITY', 'DELAYED', 'IGNORE', 'FORCE', 'STRAIGHT_JOIN',
             'SQL_SMALL_RESULT', 'SQL_BIG_RESULT', 'QUICK', 'SQL_BUFFER_RESULT', 'SQL_CACHE', 'SQL_NO_CACHE', 'SQL_CALC_FOUND_ROWS', 'WITH',
+            'OUTFILE', 'DUMPFILE',
         ],
     ];
 
@@ -150,9 +151,9 @@ class RequestSqlCore extends ObjectModel
     /**
      * Cut the request for check each cutting.
      *
-     * @param $tab
-     * @param $in
-     * @param $sql
+     * @param array<string, array> $tab
+     * @param bool $in
+     * @param string $sql
      *
      * @return bool
      */
@@ -203,6 +204,7 @@ class RequestSqlCore extends ObjectModel
     public function getTables()
     {
         $results = Db::getInstance()->executeS('SHOW TABLES');
+        $tables = [];
         foreach ($results as $result) {
             $key = array_keys($result);
             $tables[] = $result[$key[0]];
@@ -214,7 +216,7 @@ class RequestSqlCore extends ObjectModel
     /**
      * Get list of all attributes by an table.
      *
-     * @param $table
+     * @param string $table
      *
      * @return array
      */
@@ -262,8 +264,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Cut an attribute with or without the alias.
      *
-     * @param $attr
-     * @param $from
+     * @param string $attr
+     * @param array $from
      *
      * @return array|bool
      */
@@ -297,8 +299,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Get name of table by alias.
      *
-     * @param bool $alias
-     * @param $tables
+     * @param string|false $alias
+     * @param array $tables
      *
      * @return array|bool
      */
@@ -309,7 +311,9 @@ class RequestSqlCore extends ObjectModel
                 if (!isset($table['alias']) || !isset($table['table'])) {
                     continue;
                 }
-                if ($table['alias']['no_quotes'] == $alias || $table['alias']['no_quotes']['parts'][0] == $alias) {
+                /** @var string|array{'parts': array<int, bool>} $tableAlias */
+                $tableAlias = $table['alias']['no_quotes'];
+                if ($tableAlias == $alias || $tableAlias['parts'][0] == $alias) {
                     return [$table['table']];
                 }
             }
@@ -329,14 +333,14 @@ class RequestSqlCore extends ObjectModel
             $this->error_sql['returnNameTable'] = false;
 
             return false;
-        } else {
-            $tab = [];
-            foreach ($tables as $table) {
-                $tab[] = $table['table'];
-            }
-
-            return $tab;
         }
+
+        $tab = [];
+        foreach ($tables as $table) {
+            $tab[] = $table['table'];
+        }
+
+        return $tab;
     }
 
     /**
@@ -368,7 +372,7 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check if all required sentence existing.
      *
-     * @param $tab
+     * @param array $tab
      *
      * @return bool
      */
@@ -388,7 +392,7 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check if an unauthorized existing in an array.
      *
-     * @param string $tab
+     * @param array $tab
      *
      * @return bool
      */
@@ -408,7 +412,7 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "FROM" sentence.
      *
-     * @param array $from
+     * @param array<int, array<string, mixed>> $from
      *
      * @return bool
      */
@@ -425,21 +429,9 @@ class RequestSqlCore extends ObjectModel
             }
             if ($table['ref_type'] == 'ON' && (trim($table['join_type']) == 'LEFT' || trim($table['join_type']) == 'JOIN')) {
                 $attrs = $this->cutJoin($table['ref_clause'], $from);
-                if (is_array($attrs)) {
-                    foreach ($attrs as $attr) {
-                        if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
-                            $this->error_sql['checkedFrom']['attribut'] = [$attr['attribut'], implode(', ', $attr['table'])];
-
-                            return false;
-                        }
-                    }
-                } else {
-                    if (isset($this->error_sql['returnNameTable'])) {
-                        $this->error_sql['checkedFrom'] = $this->error_sql['returnNameTable'];
-
-                        return false;
-                    } else {
-                        $this->error_sql['checkedFrom'] = false;
+                foreach ($attrs as $attr) {
+                    if (!$this->attributExistInTable($attr['attribut'], $attr['table'])) {
+                        $this->error_sql['checkedFrom']['attribut'] = [$attr['attribut'], implode(', ', $attr['table'])];
 
                         return false;
                     }
@@ -453,8 +445,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "SELECT" sentence.
      *
-     * @param string $select
-     * @param string $from
+     * @param array<int, array<string, mixed>> $select
+     * @param array $from
      * @param bool $in
      *
      * @return bool
@@ -484,6 +476,15 @@ class RequestSqlCore extends ObjectModel
                         }
                     }
                 }
+
+                while (is_array($attribut['sub_tree'])) {
+                    if ($attribut['expr_type'] === 'function' && in_array(strtoupper($attribut['base_expr']), $this->tested['unauthorized'])) {
+                        $this->error_sql['checkedSelect']['function'] = $attribut['base_expr'];
+
+                        return false;
+                    }
+                    $attribut = $attribut['sub_tree'][0];
+                }
             } elseif ($in) {
                 $this->error_sql['checkedSelect']['*'] = false;
 
@@ -497,8 +498,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "WHERE" sentence.
      *
-     * @param string $where
-     * @param string $from
+     * @param array<int, array<string, mixed>> $where
+     * @param array $from
      * @param string $sql
      *
      * @return bool
@@ -545,8 +546,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "HAVING" sentence.
      *
-     * @param string $having
-     * @param string $from
+     * @param array<int, array<string, mixed>> $having
+     * @param array $from
      *
      * @return bool
      */
@@ -590,8 +591,8 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "ORDER" sentence.
      *
-     * @param string $order
-     * @param string $from
+     * @param array $order
+     * @param array $from
      *
      * @return bool
      */
@@ -658,13 +659,13 @@ class RequestSqlCore extends ObjectModel
     /**
      * Check a "LIMIT" sentence.
      *
-     * @param string $limit
+     * @param array $limit
      *
      * @return bool
      */
     public function checkedLimit($limit)
     {
-        if (!preg_match('#^[0-9]+$#', trim($limit['start'])) || !preg_match('#^[0-9]+$#', trim($limit['end']))) {
+        if (!preg_match('#^[0-9]+$#', trim($limit['offset'])) || !preg_match('#^[0-9]+$#', trim($limit['rowcount']))) {
             $this->error_sql['checkedLimit'] = false;
 
             return false;

@@ -41,7 +41,7 @@ use PrestaShop\PrestaShop\Core\Domain\Order\CommandHandler\CancelOrderProductHan
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\InvalidCancelProductException;
 use PrestaShop\PrestaShop\Core\Domain\Order\Exception\InvalidOrderStateException;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Translation\TranslatorInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @internal
@@ -158,7 +158,7 @@ final class CancelOrderProductHandler extends AbstractOrderCommandHandler implem
     {
         $history = new OrderHistory();
         $history->id_order = (int) $order->id;
-        $history->changeIdOrderState(Configuration::get('PS_OS_CANCELED'), $order);
+        $history->changeIdOrderState((int) Configuration::get('PS_OS_CANCELED'), $order);
         if (!$history->addWithemail()) {
             // email failure must not block order update process
             $this->logger->warning(
