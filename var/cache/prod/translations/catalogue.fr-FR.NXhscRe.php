@@ -5678,7 +5678,7 @@ clients grâce à la liste de vos meilleures ventes.',
     'If you have just placed an order, it may take a few minutes for it to be validated. Please refresh this page if your order is missing.' => 'Si vous venez de passer une commande, celle-ci peut mettre du temps pour être validée. Veuillez recharger cette page si votre commande ne s\'affiche pas.',
     'You have not placed any orders.' => 'Vous n\'avez pas encore passé de commande.',
     'You must wait for confirmation before returning any merchandise.' => 'Vous devez attendre notre confirmation avant de nous retourner les produits.',
-    'You have not received any credit slips.' => 'Vous n\'avez reçu aucun avoir',
+    'You have not received any credit slips.' => 'Vous n\'avez reçu aucun avoir.',
     'This product is not visible to your customers.' => 'Ce produit n\'est pas visible par vos clients.',
   ),
   'ModulesCustomersigninAdmin' => 
