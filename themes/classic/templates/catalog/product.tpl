@@ -173,7 +173,7 @@
               {if $accessories}
                 <li class="nav-item">
                   <a class="nav-link" data-toggle="tab" href="#pcdt" role="tab"
-                    aria-controls="attachments">{l s='Pièces détachée' d='Shop.Theme.Catalog'}</a>
+                    aria-controls="attachments">{l s='Spare Part' d='Shop.Theme.Catalog'}</a>
                 </li>
               {/if}
             </ul>
