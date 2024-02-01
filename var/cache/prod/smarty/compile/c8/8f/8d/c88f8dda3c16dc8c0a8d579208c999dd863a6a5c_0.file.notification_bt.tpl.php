@@ -1,18 +1,18 @@
 <?php
-/* Smarty version 3.1.34-dev-7, created on 2023-11-30 12:02:28
+/* Smarty version 3.1.34-dev-7, created on 2024-02-01 16:22:13
   from '/Applications/MAMP/htdocs/prestatest/modules/gamification/views/templates/hook/notification_bt.tpl' */
 
 /* @var Smarty_Internal_Template $_smarty_tpl */
 if ($_smarty_tpl->_decodeProperties($_smarty_tpl, array (
   'version' => '3.1.34-dev-7',
-  'unifunc' => 'content_65686bc456e626_08980825',
+  'unifunc' => 'content_65bbb72555fe26_61443692',
   'has_nocache_code' => false,
   'file_dependency' => 
   array (
     'c88f8dda3c16dc8c0a8d579208c999dd863a6a5c' => 
     array (
       0 => '/Applications/MAMP/htdocs/prestatest/modules/gamification/views/templates/hook/notification_bt.tpl',
-      1 => 1701341472,
+      1 => 1702384650,
       2 => 'file',
     ),
   ),
@@ -20,7 +20,7 @@ if ($_smarty_tpl->_decodeProperties($_smarty_tpl, array (
   array (
   ),
 ),false)) {
-function content_65686bc456e626_08980825 (Smarty_Internal_Template $_smarty_tpl) {
+function content_65bbb72555fe26_61443692 (Smarty_Internal_Template $_smarty_tpl) {
 echo '<script'; ?>
 >
 	var current_id_tab = <?php echo intval($_smarty_tpl->tpl_vars['current_id_tab']->value);?>

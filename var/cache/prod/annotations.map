@@ -192,4 +192,9 @@
   192 => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsLegacyStatsController',
   193 => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsOauthController',
   194 => 'PrestaShop\\Module\\Ps_metrics\\Controller\\Admin\\MetricsResolverController',
+  195 => 'PrestaShop\\Module\\PsAccounts\\Controller\\AbstractRestChildController',
+  196 => 'PrestaShop\\Module\\PsAccounts\\Controller\\AbstractRestController',
+  197 => 'PrestaShop\\Module\\PsAccounts\\Controller\\AbstractShopRestController',
+  198 => 'PrestaShop\\Module\\PsAccounts\\Controller\\RestControllerInterface',
+  199 => 'PrestaShop\\Module\\PsEventbus\\Controller\\AbstractApiController',
 );
